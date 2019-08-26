@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css?family=Fira+Sans+Condensed|Roboto&display=swap');
+.stay-app.fixed-overlay {
+    background-color: rgba(0,0,0,0.8);
+    display: block;
+    font-family: 'Roboto', sans-serif;
+    position: fixed;
+    overflow: auto;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+}
+.stay-app-active {
+    overflow: hidden;
+    position: fixed;
+}
+.stay-app__popup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -280px;
+    margin-top: -145px;
+}
+.stay-app__popup .gift {
+    position: absolute;
+    background: url('img/gift.png');
+    width: 152px;
+    height: 133px;
+    top: -133px;
+    left: -20px;
+}
+.stay-app__popup .popup-container {
+    background: #f5f7fa;
+    border-radius:40px 20px 5px 5px;
+    color: #434a54;
+    min-width: 500px;
+    width:500px;
+    padding: 1.5rem 1.5rem .4rem;
+}
+.stay-app__popup .popup-close {
+    color: #434a54;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    cursor:pointer;
+    transition: all ease .3s;
+    z-index: 1003;
+}
+.stay-app__popup .popup-close:hover {
+    color: #656d78;
+    transition: all ease .3s;
+}
+.stay-app__popup .popup-body {
+    text-align:center;
+}
+.stay-app__popup .popup-body .h1 {
+    font-size: 1.5rem;
+    font-weight:bold;
+    margin-top: .2rem;
+    margin-bottom: .8rem;
+    text-transform: uppercase;
+}
+.stay-app__popup .popup-body .h3 {
+    font-size:1.15rem;
+}
+.stay-app__popup .popup-body p{
+    padding:0;
+}
+.stay-app__popup .popup-body form {
+    margin: 10px 0 15px;
+}
+.stay-app__popup .popup-body .popup-form-group {
+    margin-bottom: .6rem;
+}
+.stay-app__popup .popup-body .popup-form-group label{
+    width: 7rem;
+    display: inline-block;
+    text-align: right;
+    margin-right: .5rem;
+}
+.stay-app__popup .popup-body .popup-form-group input{
+    font-size: 1rem;
+    height: 2.2rem;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 1rem;
+    height: 2.2rem;
+    width: 70%;
+    padding: 0 10px;
+}
+.stay-app__popup .popup-body .popup-form-group input.valid {
+    border: 1px solid green;
+}
+.stay-app__popup .popup-body .popup-form-group input.invalid {
+    border: 1px solid red;
+}
+.stay-app__popup .popup-body .popup-btn-send {
+    background: #dc0c25;
+    border: none;
+    border-radius: 5px 5px 20px 20px;
+    box-shadow: 0px 2px 3px rgba(0,0,0,0.3);
+    color: #fff;
+    cursor:pointer;
+    font-size: 1rem;
+    position:absolute;
+    bottom: -1.6rem;
+    left: 50%;
+    margin-left: -7rem;
+    width: 14rem;
+    padding:.5rem;
+    text-shadow: 0px 1px 3px rgba(0,0,0,0.3)
+}
+.stay-app__popup .popup-body .popup-btn-send:hover {
+    background: #b91428;
+}
+
+@media (max-device-width: 640px){
+    .stay-app__popup {
+        margin-left: -424px;
+        margin-top: -350px;
+    }
+    .stay-app__popup .popup-container {
+        width: 800px;
+    }
+    .stay-app__popup .popup-close { 
+        font-size:2.5rem;
+    }
+    .stay-app__popup .popup-body {
+        font-size: 2rem;
+    }
+    .stay-app__popup .popup-body .h1 {
+        font-size: 2.5rem;
+        font-weight: 600;
+        margin-bottom:15px;
+    }
+    .stay-app__popup .popup-body .h3 {
+        font-size: 1.8rem;
+    }
+    .stay-app__popup .popup-body p {
+        font-size: 1.6rem;
+    }
+    .stay-app__popup .popup-body form label {
+        font-size: 1.6rem;
+    }
+    .stay-app__popup .popup-body .popup-form-group input{ 
+        font-size:1.6rem;
+        height: 3.5rem;
+    }
+    .stay-app__popup .popup-body .popup-btn-send {
+        bottom: -2.5rem;
+        font-size:1.6rem;
+        margin-left: -10rem;
+        padding:1rem;
+        width: 20rem;
+    } 
+}
+@media (max-device-width: 640px) and (max-device-height: 500px ){
+    .stay-app__popup {
+        margin-left: -424px;
+        margin-top: -210px;
+    }
+    .stay-app__popup .gift {
+        display:none
+    }
+    .stay-app__popup .popup-container {
+        width: 800px;
+    }
+    .stay-app__popup .popup-close { 
+        font-size:2.5rem;
+    }
+    .stay-app__popup .popup-body h1 {
+        font-size: 1.8rem;
+        margin-bottom:15px;
+    }
+    .stay-app__popup .popup-body {
+        font-size: 1.2rem;
+    }
+    .stay-app__popup .popup-body form label {
+        font-size: 1.5rem;
+    }
+    .stay-app__popup .popup-body .popup-btn-send {
+        bottom: -2.8rem;
+        margin-left: -10rem;
+        padding:1rem;
+        width: 20rem;
+    }
+}
