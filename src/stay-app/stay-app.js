@@ -24,9 +24,6 @@ window.addEventListener('DOMContentLoaded', function() {
 
         const modal = new Modal();
 
-//      const more = document.querySelector('.more');
-//      more.addEventListener('click', modal.show);
-
         // Правильные таймеры для блока "не уходите".
         if(document.cookie.indexOf('exit_block=') == -1 && document.cookie.indexOf('exit_block_timer=') == -1){
             const expire = new Date();
@@ -35,21 +32,20 @@ window.addEventListener('DOMContentLoaded', function() {
             document.cookie = "exit_block_timer=1;";
         }
 
-        // проверяем, есть ли у нас cookie, с которой мы не показываем окно 
-        // и если нет, запускаем показ
+        // проверяем, есть ли у нас cookie, с которой мы не показываем окно и если нет, запускаем показ
         let exitBlock = getCookie("exit_block");
-        let mouseY, mouseYO;
+        let mouseY, mouseY_o;
 
         if (exitBlock != 1) {
             // Получаем вертикальные координаты курсора
             document.addEventListener('mousemove', function(event) {
-                window.mouseYO = window.mouseY;
+                window.mouseY_o = window.mouseY;
                 window.mouseY = event.pageY;
             });
             // если клиент уходит со страницы, показываем ему модаль
             // событие срабатывае только если курсор поднимается вверх
             document.body.addEventListener('mouseleave', function(event){
-                if(window.mouseY < window.mouseYO){
+                if(window.mouseY < window.mouseY_o){
                     if (exitBlock != 1) {
                         exitBlock = 1; // засчитываем посещение
                         SetCookie('exit_block', '1', 14); // учтанавливаем cookie
@@ -71,20 +67,19 @@ window.addEventListener('DOMContentLoaded', function() {
         // @param cookieName
         // @param cookieValue
         // @param nDays
-        function SetCookie(cookieName, cookieValue, nDays) {
-            let today = new Date();
-            let expire = new Date();
-            if (nDays == null || nDays == 0) { 
-                nDays = 1; 
-            }
+        function SetCookie(cookieName,cookieValue,nDays) {
+            var today = new Date();
+            var expire = new Date();
+            if (nDays==null || nDays==0) nDays=1;
             expire.setTime(today.getTime() + 3600000*24*nDays);
-            document.cookie = `${cookieName} = ${escape(cookieValue)} ;expires= ${expire.toGMTString()}`;
+            document.cookie = cookieName+"="+escape(cookieValue)+";expires="+expire.toGMTString();
         }
 
 //Send Form on Server
         const btnSend = document.getElementsByClassName('popup-btn-send')[0];
         btnSend.addEventListener('click', function(event) {
             event.preventDefault();
+            let status = false;
             const formData = {
                 phone: document.getElementById('actionPhone').value,
                 email: document.getElementById('actionEmail').value,
@@ -93,10 +88,10 @@ window.addEventListener('DOMContentLoaded', function() {
             const { phone, email } = formData;
 
             if(validPhone(phone) && validEmail(email)){
-                const msgBox = document.getElementById('msg');
+                //const msgBox = document.getElementById('msg');
                 sendFormAjax(formData)
                     .then(data => {
-                        msgBox.innerHTML = data;
+                       // msgBox.innerHTML = data;
                     })
                     .catch(error => console.log(error));
                 modal.close();
@@ -169,8 +164,9 @@ window.addEventListener('DOMContentLoaded', function() {
         // AJAX
         // @data = <object>
         // @return = json.object
+const pathAction = `${pathTmpl}/stay-app/stay-app.php`;
         function sendFormAjax(data) {
-            return fetch('stay-app.php', {
+            return fetch(pathAction, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'aplication/json, charset=utf-8',
@@ -205,30 +201,30 @@ window.addEventListener('DOMContentLoaded', function() {
         // mask Phone
         // @input = input field
         [].forEach.call( document.querySelectorAll('#actionPhone'), function(input) {
-            let keyCode;
+            var keyCode;
             function mask(event) {
                 event.keyCode && (keyCode = event.keyCode);
-                let pos = this.selectionStart;
+                var pos = this.selectionStart;
                 if (pos < 3) event.preventDefault();
-                let matrix = "+7 (___) ___ ____",
+                var matrix = "+7 (___) ___ ____",
                     i = 0,
                     def = matrix.replace(/\D/g, ""),
                     val = this.value.replace(/\D/g, ""),
                     new_value = matrix.replace(/[_\d]/g, function(a) {
-                        return i < val.length ? val.charAt(i++) || def.charAt(i) : a;
+                        return i < val.length ? val.charAt(i++) || def.charAt(i) : a
                     });
                 i = new_value.indexOf("_");
                 if (i != -1) {
                     i < 5 && (i = 3);
-                    new_value = new_value.slice(0, i);
+                    new_value = new_value.slice(0, i)
                 }
-                let reg = matrix.substr(0, this.value.length).replace(/_+/g,
+                var reg = matrix.substr(0, this.value.length).replace(/_+/g,
                     function(a) {
-                        return "\\d{1," + a.length + "}";
+                        return "\\d{1," + a.length + "}"
                     }).replace(/[+()]/g, "\\$&");
                 reg = new RegExp("^" + reg + "$");
                 if (!reg.test(this.value) || this.value.length < 5 || keyCode > 47 && keyCode < 58) this.value = new_value;
-                if (event.type == "blur" && this.value.length < 5)  this.value = "";
+                if (event.type == "blur" && this.value.length < 5)  this.value = ""
             }
 
             input.addEventListener("input", mask, false);

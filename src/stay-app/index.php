@@ -1,10 +1,5 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-<link rel="stylesheet" href="stay-app.css">
-
-<!--
-<button class="more">click</button>
-<div id="msg"></div>
--->
+<link rel="stylesheet" href="<?=SITE_TEMPLATE_PATH?>/stay-app/stay-app.css">
 
 <div class="stay-app fixed-overlay">
     <div class="stay-app__popup">
@@ -38,4 +33,5 @@
     </div>
 </div>
 
-<script src="stay-app.js"></script>
+<script>let pathTmpl = "<?=SITE_TEMPLATE_PATH?>";</script>
+<script src="<?=SITE_TEMPLATE_PATH?>/stay-app/stay-app.js"></script>

@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css?family=Fira+Sans+Condensed|Roboto&display=swap');
 .stay-app.fixed-overlay {
     background-color: rgba(0,0,0,0.8);
-    display: block;
+    display: none;
     font-family: 'Roboto', sans-serif;
     position: fixed;
     overflow: auto;
@@ -9,7 +9,7 @@
     top: 0;
     width: 100%;
     height: 100%;
-    z-index: 1000;
+    z-index: 10000;
 }
 .stay-app-active {
     overflow: hidden;
