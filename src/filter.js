@@ -10,6 +10,12 @@ document.addEventListener('DOMContentLoaded', () =>{
             let tr = document.createElement('tr');
             tr.innerHTML = '<tr style="display: block;"><td colspan="2" style="text-align:center; color:#cd3367; cursor:pointer;"><div class="btn__show_filter">Показать все параметры</div></td></tr>';
             parent.append(tr);
+            const toogleFilter = document.querySelector('.catalog_item_toogle_filter');
+            if (!toogleFilter.classList.contains('active')) {
+                toogleFilter.classList.add('active');
+                document.querySelector('.filter').style.display = 'block';
+            }
+            
         }
 
         function show(elem) {
