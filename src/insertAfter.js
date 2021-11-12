@@ -3,10 +3,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   (() => {
     
-    const wrapBlackFriday = document.querySelector('.black-friday__wrap');
-    const promotionsDetail = document.querySelector('.promotions-detail .promotions-detail__date-wrap');
+    const moveObject = document.querySelector('.black-friday__wrap');
+    const pasteAfter = document.querySelector('.promotions-detail .promotions-detail__date-wrap');
     
-    insertAfter(wrapBlackFriday, promotionsDetail);
+    insertAfter(moveObject, pasteAfter);
     
     function insertAfter(object, transfer) {
         if(object && transfer){
