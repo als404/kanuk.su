@@ -1,69 +1,69 @@
 // Константы и переменные
 const pathToFileExists = "/.file_exists.php"; // путь к фалу php, который проверяет наличие файла
-const pathDocs = "/docs/"; // путь к папке с документами
+const pathDocs = "/upload/doc/"; // путь к папке с документами
 const pathToOther = `${pathDocs}other/`; // путь к папке с разными документами
 const pathToManual = `${pathDocs}manual/`; // путь к папке с паспортами/инструкциями
-let parrentBox, childBox, beforeBox, brands,  arts, linkName, linkAlt, linkTitle, liknText, linkSRC, linkIMG;
+let parrentBox, childBox, beforeBox, brands, arts, linkName, linkAlt, linkTitle, liknText, linkSRC, linkIMG;
 
 // проверка наличия блоков в которые будем добавлять наши блоки на странице
 const checkingBox = () => {
-	beforeBox = document.querySelector('.tabs-wrap'); // блок после которого будем добавлять
-	parrentBox = document.querySelector('#addition-info');// родительский блок
-	childBox = document.querySelector('.addition-info__item'); // блок в который будем добавлять
+    beforeBox = document.querySelector('.tabs-wrap'); // блок после которого будем добавлять
+    parrentBox = document.querySelector('#addition-info');// родительский блок
+    childBox = document.querySelector('.addition-info__item'); // блок в который будем добавлять
 }
 
 // функция перебор полей характеристик товара и возврат значения поля
 // return <string>
 const propertyValue = (selector, str) => {
-	const props = document.querySelectorAll(selector);
-	for (let i = 0; i < props.length; i++) {
-		if (props[i].children[0].className == 'name' && props[i].children[0].textContent == str) {
-			return props[i].children[2].textContent.toLowerCase();
-		}
-	}
+    const props = document.querySelectorAll(selector);
+    for (let i = 0; i < props.length; i++) {
+        if (props[i].children[0].className == 'name' && props[i].children[0].textContent == str) {
+            return props[i].children[2].textContent.toLowerCase();
+        }
+    }
 }
 
 // функция поиска по массиву
 // return <boolean>
 const findValInObj = (arr, str) => {
-	for (let i = 0; i < arr.length; i++) {
-		if (arr[i].toLowerCase() == str) return true;
-	}
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i].toLowerCase() == str) return true;
+    }
 }
 // проверяем наличие бренда и артикула
 // записываем данные в объект[access]
 const accessView = (obj) => {
-	obj.access = (findValInObj(obj.brands, obj.brand()) && findValInObj(obj.arts, obj.art())) ? true : false;
+    obj.access = (findValInObj(obj.brands, obj.brand()) && findValInObj(obj.arts, obj.art())) ? true : false;
 }
 
 // объект 
 function Docs (brands = false, arts = false, linkName = false, linkTitle = '', linkText = '', linkAlt = '', linkSRC = false, linkIMG = false, imgWidth = '270', imgHeight = '382') {
-	this.brands = brands;
-	this.arts = arts;
-	this.access = false;
-	this.selector = ".catalog-detail-properties .catalog-detail-property";
-	this.brand = () => { return propertyValue(this.selector, "Производитель"); };
-	this.art = () => { return propertyValue(this.selector, "Артикул"); };
-	this.urlPDF = () => { 
-		if (linkName) {
-			return `${pathToOther + linkName}.pdf`;
-		} else if (linkSRC) {
-			return linkSRC;
-	 	} else {
-			return `${pathToManual + this.brand()}/${this.art()}.pdf`;
-		}
-	};
-	this.urlPIC = () => { 
-		if (linkName) {
-			return `${pathToOther}pic/${linkName}.jpg`;
-		} else if (linkSRC) {
-			return `${pathToOther}pic/${linkIMG}.jpg`;
-		} else {
-			return `${pathToManual + this.brand()}/pic/${this.art()}.jpg`;
-		}
-	};
-	this.childCode = `<div class="addition-info__item"><a href="${this.urlPDF()}" target="_blank"><div class="addition-info__item_inner"><img class="manual" src="${this.urlPIC()}" width="${imgWidth}" height="${imgHeight}" alt="${linkAlt}" title="${linkTitle}"></div>${linkText}</a></div>`;
-	this.parrentCode = `<div id="addition-info"><hr><h3>Полезная информация:</h3><div class="addition-info__container">${this.childCode}</div></div>`;
+    this.brands = brands;
+    this.arts = arts;
+    this.access = false;
+    this.selector = ".catalog-detail-properties .catalog-detail-property";
+    this.brand = () => { return propertyValue(this.selector, "Производитель"); };
+    this.art = () => { return propertyValue(this.selector, "Артикул"); };
+    this.urlPDF = () => { 
+        if (linkName) {
+            return `${pathToOther + linkName}.pdf`;
+        } else if (linkSRC) {
+            return linkSRC;
+        } else {
+            return `${pathToManual + this.brand()}/${this.art()}.pdf`;
+        }
+    };
+    this.urlPIC = () => { 
+        if (linkName) {
+            return `${pathToOther}pic/${linkName}.jpg`;
+        } else if (linkSRC) {
+            return `${pathToOther}pic/${linkIMG}.jpg`;
+        } else {
+            return `${pathToManual + this.brand()}/pic/${this.art()}.jpg`;
+        }
+    };
+    this.childCode = `<div class="addition-info__item"><a href="${this.urlPDF()}" target="_blank"><div class="addition-info__item_inner"><img class="manual" src="${this.urlPIC()}" width="${imgWidth}" height="${imgHeight}" alt="${linkAlt}" title="${linkTitle}"></div>${linkText}</a></div>`;
+    this.parrentCode = `<div id="addition-info"><hr><h3>Полезная информация:</h3><div class="addition-info__container">${this.childCode}</div></div>`;
 }
 
 // проверяем наличие файла на сервере AJAX
@@ -73,7 +73,7 @@ const ajaxFileExists = async (url, data) => {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-			"Accept":       "application/json" 
+            "Accept":       "application/json" 
         },
         body: data,
     });
@@ -84,14 +84,14 @@ const ajaxFileExists = async (url, data) => {
 // Вывод блоков. Первым будем проверять наличие файла инструкций/паспорта на сайте если
 // файл присутствует выводим его на страницу, затем будем выводить декларации и статьи.
 const viewBlock = (obj) => {
-	checkingBox();
-	if (beforeBox && obj.access) {
-		if (parrentBox) {
-			childBox.insertAdjacentHTML('afterEnd', obj.childCode);
-		} else {
-			beforeBox.insertAdjacentHTML('afterEnd', obj.parrentCode);
-		}
-	}
+    checkingBox();
+    if (beforeBox && obj.access) {
+        if (parrentBox) {
+            childBox.insertAdjacentHTML('afterEnd', obj.childCode);
+        } else {
+            beforeBox.insertAdjacentHTML('afterEnd', obj.parrentCode);
+        }
+    }
 }
 
 // подготавливаем блоки для вывода на страницу
@@ -172,6 +172,17 @@ liknText = linkTitle;
 const declarationsBrexDecalBrexFlowBrexit = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
 
 //*****************************************************************************/
+// Декларация о соответствии на электрический опрессовщик BrexTEST 10000 для Brexit
+brands = ["Brexit"];
+arts = ["2020029", "2020030", "2020031"];
+linkName = 'declarations-BrexTEST_2020029-BREXIT';
+linkTitle = 'Декларация о соответствии';
+linkAlt = linkTitle;
+liknText = linkTitle;
+
+const declarationsBrexTEST2020029BREXIT = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
+
+//*****************************************************************************/
 // Декларация о соответствии на BrexJET Electirc и BrexTEST PRO для Brexit
 brands = ["Brexit"];
 arts = ["5000002", "5000004", "2020034", "2020035", "2020036", "2020039"];
@@ -181,6 +192,50 @@ linkAlt = linkTitle;
 liknText = linkTitle;
 
 const declaarationsBrexJETElectricBrexTESTProBREXIT = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
+
+//*****************************************************************************/
+// Декларация о соответствии на Оборудование для сварки плаcтиковых труб для ESSON
+brands = ["Esson"];
+arts = ["40040", "40063", "40064", "40065", "40110", "41160", "41250", "42160", "42250", "42315", "42630"];
+linkName = 'decl2021-cn-pa01-b-82739_21';
+linkTitle = 'Декларация о соответствии';
+linkAlt = linkTitle;
+liknText = linkTitle;
+
+const decl2021CNPa01B8273921 = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
+
+//*****************************************************************************/
+// Декларация о соответствии на BrexPULSE 2000 для Brexit
+brands = ["Brexit"];
+arts = ["6001002"];
+linkName = 'decl2021-BrexPulse-2000-BREXIT';
+linkTitle = 'Декларация о соответствии';
+linkAlt = linkTitle;
+liknText = linkTitle;
+
+const decl2021BrexPulse2000 = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
+
+//*****************************************************************************/
+// Декларация о соответствии на BrexHEAT для Brexit
+brands = ["Brexit"];
+arts = ["6001200", "6001201", "6001202"];
+linkName = 'decl2021-eaecnrudby.pa01.b.26663-BREXIT';
+linkTitle = 'Декларация о соответствии';
+linkAlt = linkTitle;
+liknText = linkTitle;
+
+const decl2021BrexHeat = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
+
+//*****************************************************************************/
+// Декларация о соответствии на BrexFLOW PRO 3000, BrexFLOW PRO Termal 3000, BrexFLOW PRO 4000, BrexFLOW PRO Termal 4000 для Brexit
+brands = ["Brexit"];
+arts = ["6002051", "6002052", "6002053", "6002054"];
+linkName = 'decl2021_eacnrudby.pa01.b.76325-BREXIT';
+linkTitle = 'Декларация о соответствии';
+linkAlt = linkTitle;
+liknText = linkTitle;
+
+const decl2021BrexFlow76325Brexit = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt);
 
 //*****************************************************************************/
 // статья "Размеры трубной резьбы: основные обозначения и стандарты"
@@ -198,7 +253,7 @@ const article001 = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt
 //*****************************************************************************/
 // статья "Что значит SDR в маркировке полиэтиленовых труб"
 brands = ["Virax", "BREXIT", "HURNER"];
-arts = ["575022", "575023", "575024", "4000115", "4000117", "216-100-191", "216-100-230", "4000201", "4000202", "4000203", "4000204", "4000205", "4000206", "4000207", "4000208", "4000209", "4000210", "4000211"];
+arts = ["575022", "575023", "575024", "4000115", "4000116", "4000117", "4000118", "4000120", "4000121", "4000122", "4000123", "216-100-191", "216-100-230", "4000201", "4000202", "4000203", "4000204", "4000205", "4000206", "4000207", "4000208", "4000209", "4000210", "4000211"];
 linkName = '';
 linkIMG = 'article002';
 linkSRC = '/reviews/chto-znachit-sdr-v-markirovke-polietilenovykh-trub-/';
@@ -210,37 +265,55 @@ const article002 = new Docs(brands, arts, linkName, linkTitle, liknText, linkAlt
 
 //*****************************************************************************/
 ajaxFileExists(pathToFileExists, json)
-.then(data => { if (data.file) { manual.access = data.file; } })
+.then(data => { 
+    if (data.file) { manual.access = data.file; } 
+})
 .then( () => {
 // Паспорт/инструкция
-	viewBlock(manual);
+    viewBlock(manual);
 // Декларации и письма
-	// Декларация о соответствии на резьбонарезные станки для Esson
-	accessView(declarationsElectricCutEsson);
-	viewBlock(declarationsElectricCutEsson);
-	// Декларация о соответствии на желобонакатные станки для Esson
-	accessView(declarationsElectricGroEsson);
-	viewBlock(declarationsElectricGroEsson);
-	// отказное письмо №263 для Virax
-	accessView(otkazpismo263);
-	viewBlock(otkazpismo263);
-	// отказное письмо №823 для Brexit
-	accessView(spravkaObPodtverzhdeniiSootvetstviya);
-	viewBlock(spravkaObPodtverzhdeniiSootvetstviya);
-	// Декларация о соответствии на масло для Virax
-	accessView(declarOilVirax);
-	viewBlock(declarOilVirax);
-	// Декларация о соответствии на химические насосы BrexDECAl и BrexFLOW для Brexit
-	accessView(declarationsBrexDecalBrexFlowBrexit);
-	viewBlock(declarationsBrexDecalBrexFlowBrexit);
-	// Декларация о соответствии на BrexJET Electirc и BrexTEST PRO для Brexit
-        accessView(declaarationsBrexJETElectricBrexTESTProBREXIT);
-        viewBlock(declaarationsBrexJETElectricBrexTESTProBREXIT);
+    // Декларация о соответствии на резьбонарезные станки для Esson
+    accessView(declarationsElectricCutEsson);
+    viewBlock(declarationsElectricCutEsson);
+    // Декларация о соответствии на желобонакатные станки для Esson
+    accessView(declarationsElectricGroEsson);
+    viewBlock(declarationsElectricGroEsson);
+    // отказное письмо №263 для Virax
+    accessView(otkazpismo263);
+    viewBlock(otkazpismo263);
+    // отказное письмо №823 для Brexit
+    accessView(spravkaObPodtverzhdeniiSootvetstviya);
+    viewBlock(spravkaObPodtverzhdeniiSootvetstviya);
+    // Декларация о соответствии на масло для Virax
+    accessView(declarOilVirax);
+    viewBlock(declarOilVirax);
+    // Декларация о соответствии на химические насосы BrexDECAl и BrexFLOW для Brexit
+    accessView(declarationsBrexDecalBrexFlowBrexit);
+    viewBlock(declarationsBrexDecalBrexFlowBrexit);
+    // Декларация о соответствии на электрический опрессовщик BrexTEST 10000 для Brexit
+    accessView(declarationsBrexTEST2020029BREXIT);
+    viewBlock(declarationsBrexTEST2020029BREXIT);
+    // Декларация о соответствии на BrexJET Electirc и BrexTEST PRO для Brexit
+    accessView(declaarationsBrexJETElectricBrexTESTProBREXIT);
+    viewBlock(declaarationsBrexJETElectricBrexTESTProBREXIT);
+    // Декларация о соответствии на Оборудование для сварки плаcтиковых труб для ESSON
+    accessView(decl2021CNPa01B8273921);
+    viewBlock(decl2021CNPa01B8273921);
+    // Декларация о соответствии на BrexPULSE 2000 для Brexit
+    accessView(decl2021BrexPulse2000);
+    viewBlock(decl2021BrexPulse2000);
+    // Декларация о соответствии на BrexHEAT для Brexit
+    accessView(decl2021BrexHeat);
+    viewBlock(decl2021BrexHeat);
+    // Декларация о соответствии на BrexFLOW PRO 3000, BrexFLOW PRO Termal 3000, BrexFLOW PRO 4000, 
+    // BrexFLOW PRO Termal 4000 для Brexit
+    accessView(decl2021BrexFlow76325Brexit);
+    viewBlock(decl2021BrexFlow76325Brexit);
 // Статьи
-	// статья "Размеры трубной резьбы: основные обозначения и стандарты"
-	accessView(article001);
-	viewBlock(article001);
-	// статья "Что значит SDR в маркировке полиэтиленовых труб"
-	accessView(article002);
-	viewBlock(article002);
+    // статья "Размеры трубной резьбы: основные обозначения и стандарты"
+    accessView(article001);
+    viewBlock(article001);
+    // статья "Что значит SDR в маркировке полиэтиленовых труб"
+    accessView(article002);
+    viewBlock(article002);
 });
