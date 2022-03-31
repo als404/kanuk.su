@@ -1,15 +1,30 @@
-'use strict';
-
 document.addEventListener('DOMContentLoaded', () =>{
     (() => {
+        'use strict';
+        const filterList = document.querySelectorAll('.bx_filter_box');
 
-        const filterBox = document.querySelector('.filter table tbody'), 
-            filterList = filterBox.querySelectorAll('.bx_filter_box');
+        if (filterList.length != 0) {
+            init(document.querySelector('.filter table tbody'));
 
-        function start(parent) {
+            const btnShowFilter = document.querySelector('.btn__show_filter');
+
+            hideProps(filterList, btnShowFilter);
+
+            btnShowFilter.addEventListener('click', () => {
+                showProps(filterList, btnShowFilter);
+            });
+        }
+
+        function init(parent) {
             let tr = document.createElement('tr');
             tr.innerHTML = '<tr style="display: block;"><td colspan="2" style="text-align:center; color:#cd3367; cursor:pointer;"><div class="btn__show_filter">Показать все параметры</div></td></tr>';
             parent.append(tr);
+
+            const toogleFilter = document.querySelector('.catalog_item_toogle_filter');
+            if (!toogleFilter.classList.contains('active')) {
+                toogleFilter.classList.add('active');
+                document.querySelector('.filter').style.display = 'block';
+            }
         }
 
         function show(elem) {
@@ -29,12 +44,12 @@ document.addEventListener('DOMContentLoaded', () =>{
                     hide(item)
                 }     
             });
-
+            
             if(btn) {
                 btn.classList = 'btn__show_filter';
                 btn.innerText = 'Показать все параметры';
                 btn.addEventListener('click', () => {
-                    showProps(filterList, btn);
+                    showProps(boxs, btn);
                 });
             }
         }
@@ -50,19 +65,9 @@ document.addEventListener('DOMContentLoaded', () =>{
             btn.innerText = 'Скрыть параметры';
 
             btn.addEventListener('click', () => {
-                hideProps(filterList, btn);
+                hideProps(boxs, btn);
             });
         }
-        
-        start(filterBox);
-
-        const btnShowFilter = document.querySelector('.btn__show_filter');
-
-        hideProps(filterList, btnShowFilter);
-
-        btnShowFilter.addEventListener('click', () => {
-            showProps(filterList, btnShowFilter);
-        });
    
     })(); 
 });
