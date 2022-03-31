@@ -1,7 +1,7 @@
 <?php
 require(BASE.'/connect_db/class_pdo.php');
 
-class queryDB extends DB {
+class currencyUpdate extends DB {
 	private $_db = null;
 
 	public function __construct() {
