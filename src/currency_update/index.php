@@ -8,12 +8,12 @@ $data['sql']['query'] = 'SELECT * FROM b_catalog_currency';
 if($data['xml'] === false){
     $data['msg'] = 'Произошла ошибка, данные не обновились!';
 } else { 
-    $query = new queryDB;
+    $query = new currencyUpdate;
     foreach($query->getCurrency($data) as $q) {
         if ($q->CURRENCY == 'RUB') {
             continue;
         } else {
-            $amount = queryDB::getAmount($q->CURRENCY, $data['xml']);
+            $amount = currencyUpdate::getAmount($q->CURRENCY, $data['xml']);
             $data['sql']['query'] = 'UPDATE b_catalog_currency SET AMOUNT = :amount, DATE_UPDATE = NOW(), CURRENT_BASE_RATE = :amount WHERE CURRENCY = :currency';
             $data['sql']['params'] = [
                 ':amount' => $amount,
