@@ -1,0 +1,37 @@
+body {
+    min-width: 362px;
+}
+.content {
+    margin-top: 1em;
+}
+.row > div {
+    text-align:center;
+}
+.form-file input {
+    border: 1px solid #ccc;
+    width: 100%;
+    height: 38px;
+}
+.form-file .btn-tertiary{color:#555;padding:0;line-height:44px;width:300px;margin:auto;display:block;border:2px solid #555;}
+.form-file .btn-tertiary:hover,.form-file .btn-tertiary:focus{color:#888;border-color:#888}
+.form-file .input-file{width:.1px;height:.1px;opacity:0;overflow:hidden;position:absolute;z-index:-1}
+.form-file .input-file + .js-labelFile{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px;cursor:pointer}
+.form-file .input-file + .js-labelFile .icon:before{content:"\f093"}
+.form-file .input-file + .js-labelFile.has-file .icon:before{content:"\f00c";color:#5AAC7B}
+.form-check-label{padding-left:10px;}
+.btn {border-width:2px;border-color:#555;color:#555}
+
+@media (min-width: 768px) {
+    .form-file .btn-tertiary{width:210px;}
+    .form-check-label{padding-left:0;}
+}
+@media (min-width: 992px) {
+    .form-file .btn-tertiary{width:280px;}
+}
+@media (min-width: 1200px) {
+    .form-file .btn-tertiary{width:250px;}
+}
+@media (min-width: 1400px) {
+    .form-file .btn-tertiary{width:300px;}
+    .form-check-label{padding-left:10px;}
+}
