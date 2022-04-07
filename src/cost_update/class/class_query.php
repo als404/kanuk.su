@@ -1,5 +1,5 @@
 <?php
-require_once(BASE.'/local/modules/connect_db/class_pdo.php');
+require_once(MODULES.'/lib/class_pdo.php');
 class queryDB extends DB {
 	private $_db = null;
 
@@ -11,5 +11,10 @@ class queryDB extends DB {
         $query = $this->_db->prepare($data['sql']['query']);
         $query->execute();
         return $query->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    public function set($data) {
+        $query = $this->_db->prepare($data['sql']['query']);
+        $query->execute($data['sql']['params']);
     }
 }
