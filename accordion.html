@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>accordion</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+    body {
+        max-width: 958px; font-style: normal;
+        font-family: "Open Sans", sans-serif;
+        font-optical-sizing: auto;
+    }
+    /* accordion */
+    .accordion {
+      border: 1px solid #ddd;
+      margin-bottom:10px;
+    }
+        
+      .accordion__heading {
+        display: block; 
+        font-size: 15px;
+        position: relative; 
+        cursor: pointer;
+        padding: 10px 15px; 
+        margin: 0;
+        background: #efefef;
+        color: black;
+      }
+        
+      .accordion__heading:after, .accordion__heading:before {
+        content: ""; 
+        position: absolute;
+        width: 12px; 
+        height: 3px;
+        top: 50%; 
+        right: 20px;
+        background: black;
+        transition: all 0.1s;
+      }
+
+      .accordion__checkbox:checked~.accordion__heading:before {
+        transform: rotate(90deg);
+        opacity: 0;
+        transition: all 0.1s;
+      }
+
+      .accordion__heading:after {
+        transform: rotate(90deg);
+        transition: all 0.1s;
+      }
+
+      .accordion__checkbox:checked~.accordion__heading:after {
+        transform: rotate(180deg);
+      }
+
+      .accordion__checkbox {
+        display: none; 
+        position: absolute; 
+        left: -9999em;
+      }
+
+      .accordion__checkbox:checked~.accordion__content {
+        max-height: 1000px;
+        transition: all 2s;
+      }
+
+      .accordion__content {
+        max-height: 0; 
+        overflow: hidden; 
+        padding: 0 15px;
+        transition: all 0.5s;
+      }
+      .accordion__content p {
+        padding: 15px 0;
+      }
+
+    @media (max-width: 1253px) { 
+      .production-services .pictures {
+        display: block;
+      }
+      .production-services .pictures img {
+        margin-bottom: 20px;
+      }
+      .production-services .pictures img:last-child {
+        margin-bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="accordion">
+
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-1">
+      <label class="accordion__heading" for="accordion-heading-1">Какие металлы можно окрашивать порошковым методом?</label>
+      <div class="accordion__content">
+        <p>Порошковая покраска применяется для большинства металлических поверхностей, таких как сталь, алюминий, чугун. Важно, чтобы поверхность была проводящей, так как процесс основан на электростатическом распылении порошка.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-2">
+      <label class="accordion__heading" for="accordion-heading-2">Насколько прочным является порошковое покрытие?</label>
+      <div class="accordion__content">
+        <p>Покрытие устойчиво к механическим повреждениям, истиранию и коррозии. Оно значительно превосходит традиционные краски по долговечности и стойкости к химическим воздействиям.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-3">
+      <label class="accordion__heading" for="accordion-heading-3">Какова максимальная толщина покрытия при порошковой покраске?</label>
+      <div class="accordion__content">
+        <p>Толщина покрытия обычно варьируется от 60 до 120 микрон, в зависимости от требований к изделию и условий эксплуатации. Возможна настройка процесса для более толстого слоя.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-4">
+      <label class="accordion__heading" for="accordion-heading-4">Как подготовить поверхность перед порошковой покраской?</label>
+      <div class="accordion__content">
+        <p>Металлическая поверхность должна быть тщательно очищена от ржавчины, старого покрытия и загрязнений. Обычно применяют пескоструйную или дробеструйную очистку, а также обезжиривание для улучшения адгезии.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-5">
+      <label class="accordion__heading" for="accordion-heading-5">Сколько времени занимает процесс покраски?</label>
+      <div class="accordion__content">
+        <p>Полный цикл покраски, включая подготовку поверхности, нанесение покрытия и его полимеризацию, занимает от нескольких часов до одного рабочего дня, в зависимости от размера и сложности изделия.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-6">
+      <label class="accordion__heading" for="accordion-heading-6">Предоставляете ли вы услуги пробной гибки для тестирования?</label>
+      <div class="accordion__content">
+        <p>Да, мы можем выполнить пробную гибку для проверки соответствия параметров чертежу перед началом серийного производства. Это особенно важно при сложных или нестандартных заказах.</p>
+      </div>
+    </section>
+  
+    <section>
+      <input type="checkbox" class="accordion__checkbox" id="accordion-heading-7">
+      <label class="accordion__heading" for="accordion-heading-7">Какие гарантии вы предоставляете на выполненные работы?</label>
+      <div class="accordion__content">
+        <p>Мы гарантируем точность гибки и соответствие готовых изделий предоставленным чертежам. Все работы проходят строгий контроль качества, и мы предоставляем гарантию на выполненные услуги.</p>
+      </div>
+    </section>
+  
+  </div>
+
+</body>
+</html>
