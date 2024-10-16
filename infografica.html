@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+body {
+    max-width: 958px; font-style: normal;
+    font-family: "Open Sans", sans-serif;
+    font-optical-sizing: auto;
+}
+
+.production-services div.form {
+	text-align: center; margin-top: 20px;
+}
+.production-services button {
+	background: #cd3367; border-radius: 5px;
+	cursor: pointer; border: 0; padding: 10px 20px;
+	color: white; font-size: 15px;
+	text-transform: uppercase; margin-bottom: 10px;
+}
+.production-services .b24-form-control-label {
+	text-align: left;
+}
+.production-services .b24-form-header-title {
+	font-family: "Open Sans", sans-serif;
+	font-size: 20px; margin-top: 20px;
+	text-transform: uppercase;
+}
+/*** Infographics ***/
+.production-services .infographics {
+    display: flex; flex-wrap: wrap; justify-content: space-around;
+}
+	.production-services .infographics .item {
+		width: 300px; text-align: center;
+	}
+	.production-services .infographics .item .icon {
+		margin-top: 20px; margin-bottom: 10px;
+	}
+	.production-services .infographics .item .text {
+		font-size: 12px; padding: 0 10px;
+	}
+	.production-services .infographics .item .text b { display: block; }
+
+/*** Modal ***/
+.modal {
+	position: fixed; top: 0; left: 0;
+	z-index: 1050; display: none;
+	width: 100%; height: 100%; overflow: hidden;
+	background-color: rgba(0, 0, 0, 0.5);
+}
+  .modal__dialog {
+    position: relative; max-width: 500px;
+	margin: 40px auto;
+  }
+  .modal__content {
+	position: relative; width: 100%;
+	padding: 40px; background-color: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 4px; max-height: 80vh;
+	overflow-y: auto;
+  }
+  .modal__close {
+	position: absolute; top: 8px;
+	right: 14px; font-size: 30px;
+	color: #000; opacity: 0.5;
+	font-weight: 700; border: none;
+	background-color: transparent;
+	cursor: pointer; z-index: 10;
+  }
+  .modal__title {
+	text-align: center; font-size: 22px;
+	text-transform: uppercase;
+  }
+  .modal__input {
+	display: block; margin: 20px auto 20px auto;
+	width: 280px; height: 50px; background: #fff;
+	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+	border: none; font-size: 18px; text-align: center;
+	padding: 0 20px; outline: 0;
+  }
+  .modal .btn {
+	display: block; width: 280px; margin: 0 auto;
+  }
+  .show { display: block; }
+  .hide { display: none; }
+  .fade { animation-name: fade; animation-duration: 1.5s; }
+  @keyframes fade {
+	from { opacity: 0.1; }
+	to { opacity: 1; }
+  }
+        
+        
+    </style>
+</head>
+<body>
+<section class="production-services">
+    <div class="form">
+        <button class="btn" data-modal>Рассчитать стоимость</button>
+            <div class="modal hide">
+                <div class="modal__dialog">
+                    <div class="modal__close" data-close="">&times;</div>
+                    <script data-b24-form="inline/86/2b4d7z" data-skip-moving="true">(function(w,d,u){var s=d.createElement('script');s.async=true;s.src=u+'?'+(Date.now()/180000|0);var h=d.getElementsByTagName('script')[0];h.parentNode.insertBefore(s,h);})(window,document,'https://cdn-ru.bitrix24.ru/b8517987/crm/form/loader_86.js');</script>
+                </div>
+            </div>
+    </div>
+        
+    <div class="infographics">
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/01.png" alt="значок для консультация и уточнение деталей" /></div>
+            <div class="text"><b>Консультация и уточнение деталей:</b> мы начинаем с изучения чертежей и требований к изделию. На этом этапе проводится детальный анализ материала, размеров, допусков и специфики обработки, чтобы понять точные потребности клиента.</div>
+        </section>
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/02.png" alt="значок для программирование станка" /></div>
+            <div class="text"><b>Программирование станка:</b> на основе чертежей и технических требований наши инженеры разрабатывают 3D-модель детали и составляют программу для станка ЧПУ, учитывая особенности обработки и точные параметры резки.</div>
+        </section>
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/03.png" alt="значок для подготовка материалов и оборудования" /></div>
+            <div class="text"><b>Подготовка материалов и оборудования:</b> мы выбираем и подготавливаем материалы, необходимые для обработки, а также проверяем настройки станков ЧПУ насоответствие параметрам проекта. Оборудование настраивается для оптимального выполнения задачи.
+            </div>
+        </section>
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/04.png" alt="значок для процесс токарной обработки" /></div>
+            <div class="text"><b>Процесс токарной обработки:</b> оператор запускает процесс обработки на станке ЧПУ. Деталь изготавливается с высокой точностью благодаря автоматизации, что исключает ошибки и дефекты.</div>
+        </section>
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/05.png" alt="значок для контроль качества" /></div>
+            <div class="text"><b>Контроль качества:</b> деталь проходит многоуровневую проверку на соответствие чертежам и техническим параметрам. Мы используем современные методы контроля для гарантии точности и качества каждой детали.</div>
+        </section>
+    
+        <section class="item">
+            <div class="icon"><img src="https://discount-tools.ru/upload/production-services/icon/tokar/06.png" alt="значок для упаковка и доставка готового изделия" /></div>
+            <div class="text"><b>Упаковка и доставка готового изделия:</b> после успешного контроля качества деталь бережно упаковывается и подготавливается к отправке. Мы обеспечиваем быструю и безопасную доставку изделия в любой регион, следя за тем, чтобы оно дошло в идеальном состоянии.</div>
+        </section>
+    
+    </div>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    (() => {
+        'use strict';
+        
+        document.querySelectorAll('[data-modal]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modal = e.target.nextElementSibling;
+                if (!modal) return;
+
+                showModal(modal);
+                setupModalEventListeners(modal);
+            });
+        });
+
+        function setupModalEventListeners(modal) {
+            setupCloseButton(modal);
+            setupEscapeKey(modal);
+            setupSubmitButton(modal);
+        }
+
+        function setupCloseButton(modal) {
+            const btnClose = modal.querySelector('[data-close]');
+            if (!btnClose) return;
+
+            btnClose.addEventListener('click', () => hideModal(modal));
+        }
+
+        function setupEscapeKey(modal) {
+            const handleEscape = (e) => {
+                if (modal.classList.contains('show') && e.code === 'Escape') {
+                    hideModal(modal);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        }
+
+        function setupSubmitButton(modal) {
+            const submit = modal.querySelector('button[type=submit]');
+            if (!submit) return;
+
+            submit.addEventListener('click', () => {
+                if (areAlertsHidden(modal)) {
+                    setTimeout(() => hideModal(modal), 2500);
+                }
+            });
+        }
+
+        function toggleBodyScroll(isHidden) {
+            document.body.style.overflow = isHidden ? 'hidden' : '';
+        }
+
+        function showModal(modalElement) {
+            if (!modalElement) return;
+            modalElement.classList.add('show', 'fade');
+            modalElement.classList.remove('hide');
+            toggleBodyScroll(true);
+        }
+
+        function hideModal(modalElement) {
+            if (!modalElement) return;
+            modalElement.classList.add('hide');
+            modalElement.classList.remove('show', 'fade');
+            toggleBodyScroll(false);
+        }
+
+        function areAlertsHidden(modalElement) {
+            const alerts = modalElement.querySelectorAll('.b24-form-control-alert-message');
+            return Array.from(alerts).every(alert => alert.style.display === 'none');
+        }
+
+    })(); 
+});
+
+</script>
+</body>
+</html>
