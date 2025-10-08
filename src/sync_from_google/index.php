@@ -5,11 +5,11 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Подключаем файлы 1С-битрикс
-require_once(__DIR__.'/_bitrix.php');
+require_once(__DIR__.'/bitrix.php');
 // Подключаем класс для выполнения SQL-запросов
-require_once(__DIR__.'/_classes.php');
+require_once(__DIR__.'/classes.php');
 // Подключаем functions
-require_once(__DIR__.'/_func.php');
+require_once(__DIR__.'/func.php');
 
 // Основная логика
 $id = '1DDMulcd1VOjMaF9N_pCOfiQUqEs9HWbi96bdXDouOmM';
