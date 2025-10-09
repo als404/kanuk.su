@@ -13,21 +13,36 @@ require_once(__DIR__.'/func.php');
 
 // Основная логика
 $id = '1DDMulcd1VOjMaF9N_pCOfiQUqEs9HWbi96bdXDouOmM';
-$gid = '1078493664';
-$range = 'D325:H330';
-$brand_id = '267';
 $iblock_id = 51;
 $facet_id = 104;
+$data['resource'] = [
+    [
+    'docId' => $id,
+    'listId' => '1078493664', 
+    'range' => 'D3:H350',
+    'brandName' => 'BREXIT', 
+    'iblock_id' => $iblock_id,
+    'facet_id' => $facet_id,
+    ],
+    [
+    'docId' => $id,
+    'listId' => '1145536272',
+    'range' => 'D4:H40',
+    'brandName' => 'Esson', 
+    'iblock_id' => $iblock_id,
+    'facet_id' => $facet_id,
+    ],
+];
 
 // Обработка данных
 try {
-    $data['json'] = checkingCacheDate($id, $gid, $range);
+    $data['json'] = checkingCacheDate($data['resource']);
 
     // Определяем товары, у которых изменилась доступность
-    $data['refresh'] = processData($data['json'], $brand_id, $iblock_id, $facet_id);
+    $data['refresh'] = processData($data);
        
     // Обновляем остатки
-    updateStock($data['json'], $brand_id, $iblock_id, $facet_id);
+    updateStock($data);
 
     // Очистка кэша для найденных товаров
     if (!empty($data['refresh'])) {
