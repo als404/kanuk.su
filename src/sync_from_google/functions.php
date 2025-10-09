@@ -15,7 +15,7 @@ function fetchGoogleSheetData($id, $gid, $range) {
 }
 
 //  Функция проверки даты кэша файла
-function checkingCacheDate($id, $gid, $range){
+function checkingCacheDate(array $data){
     // Путь к кэш-файлу
     $cacheFile = __DIR__ . '/leftover-product.json';
 
@@ -27,13 +27,18 @@ function checkingCacheDate($id, $gid, $range){
             $array = $cacheData;
         } else {
             // Кэш устарел — обновляем
-            $array = fetchGoogleSheetData($id, $gid, $range);
+            foreach($data as $resource){
+                $array[$resource['brandName']] = fetchGoogleSheetData($resource['docId'], $resource['listId'], $resource['range']);
+            }
+            
             $array['date'] = time();
             file_put_contents($cacheFile, json_encode($array));
         }
     } else {
         // Кэш не существует — загружаем данные
-        $array = fetchGoogleSheetData($id, $gid, $range);
+        foreach($data as $resource){
+            $array[$resource['brandName']] = fetchGoogleSheetData($resource['docId'], $resource['listId'], $resource['range']);
+        }
         $array['date'] = time();
         file_put_contents($cacheFile, json_encode($array));
     }
@@ -41,37 +46,49 @@ function checkingCacheDate($id, $gid, $range){
     return $array;
 }
 
+// Функция получает имя бренда и возвращает ID для него
+function getBrandId(string $name){
+    $stockQuery = new StockQuery();
+    
+    return $stockQuery->getBrandID(strtolower($name));
+}
 
 // Обновление остатков всегда
-function updateStock(array $data, string $brand_id, string $iblock_id, string $facet_id)
-{
+function updateStock(array $data){
     $stockQuery = new StockQuery();
 
-    foreach ($data as $row) {
-        $art = trim($row[0]);
-        $new_qty = trim($row[4]);
+    foreach($data['resource'] as $resource) {
+        $brand_name = $resource['brandName'];
+        $brand_id = getBrandId($brand_name);
+        $iblock_id = $resource['iblock_id'];
+        $facet_id = $resource['facet_id'];
 
-        if (!empty($art) && is_numeric($new_qty)) {
-            $params = [
-                'art' => $art,
-                'brand_id' => $brand_id,
-                'iblock_id' => $iblock_id,
-                'facet_id' => $facet_id
-            ];
-
-            $result = $stockQuery->get($params);
-
-            if (!empty($result)) {
-                $stmt = $stockQuery->set([
+        foreach($data['json'][$brand_name] as $row){
+            $art = trim($row[0]);
+            $new_qty = trim($row[4]);
+    
+            if (!empty($art) && is_numeric($new_qty)) {
+                $params = [
                     'art' => $art,
                     'brand_id' => $brand_id,
-                    'new_qty' => $new_qty
-                ]);
-
-                if ($stmt) {
-                    echo "Остатки товара с артикулом {$art} обновлены.\n";
-                } else {
-                    echo "Ошибка обновления остатков товара с артикулом {$art}.\n";
+                    'iblock_id' => $iblock_id,
+                    'facet_id' => $facet_id
+                ];
+    
+                $result = $stockQuery->get($params);
+    
+                if (!empty($result)) {
+                    $stmt = $stockQuery->set([
+                        'art' => $art,
+                        'brand_id' => $brand_id,
+                        'new_qty' => $new_qty
+                    ]);
+    
+                    if ($stmt) {
+                        echo "Остатки товара с артикулом {$art} обновлены.\n";
+                    } else {
+                        echo "Ошибка обновления остатков товара с артикулом {$art}.\n";
+                    }
                 }
             }
         }
@@ -79,31 +96,38 @@ function updateStock(array $data, string $brand_id, string $iblock_id, string $f
 }
 
 // Определение товаров, у которых изменилась доступность
-function processData(array $data, string $brand_id, string $iblock_id, string $facet_id)
-{
+function processData(array $data){
+
     $query = new StockQuery();
     $result = [];
 
-    foreach ($data as $row) {
-        $art = trim($row[0]);
-        $new_qty = trim($row[4]);
+    foreach($data['resource'] as $resource) {
+        $brand_name = $resource['brandName'];
+        $brand_id = getBrandId($brand_name);
+        $iblock_id = $resource['iblock_id'];
+        $facet_id = $resource['facet_id'];
 
-        if (!empty($art) && is_numeric($new_qty)) {
-            $params = [
-                'art' => $art,
-                'brand_id' => $brand_id,
-                'iblock_id' => $iblock_id,
-                'facet_id' => $facet_id
-            ];
+        foreach($data['json'][$brand_name] as $row) {
+            $art = trim($row[0]);
+            $new_qty = trim($row[4]);
 
-            $dbResult = $query->get($params);
-
-            if (!empty($dbResult)) {
-                $old_qty = $dbResult[0]->qty;
-
-                // Проверяем, изменилась ли доступность
-                if (($old_qty == 0 && $new_qty > 0) || ($old_qty > 0 && $new_qty == 0)) {
-                    $result[] = ['prodId' => $dbResult[0]->prodId];
+            if (!empty($art) && is_numeric($new_qty)) {
+                $params = [
+                    'art' => $art,
+                    'brand_id' => $brand_id,
+                    'iblock_id' => $iblock_id,
+                    'facet_id' => $facet_id
+                ];
+            
+                $dbResult = $query->get($params);
+            
+                if (!empty($dbResult)) {
+                    $old_qty = $dbResult[0]->qty;
+            
+                    // Проверяем, изменилась ли доступность
+                    if (($old_qty == 0 && $new_qty > 0) || ($old_qty > 0 && $new_qty == 0)) {
+                        $result[] = ['prodId' => $dbResult[0]->prodId];
+                    }
                 }
             }
         }
@@ -114,7 +138,7 @@ function processData(array $data, string $brand_id, string $iblock_id, string $f
 
 // Функция для очистки кэша элемента и категорий
 function clearHtmlCacheByElementId($elementId, $iblockId) {
-    echo "Начало выполнения clearHtmlCacheByElementId для элемента ID: {$elementId}, инфоблока ID: {$iblockId}\n";
+    // echo "Начало выполнения clearHtmlCacheByElementId для элемента ID: {$elementId}, инфоблока ID: {$iblockId}\n";
 
     // Получаем данные элемента
     $element = new CIBlockElement();
@@ -242,5 +266,5 @@ function clearHtmlCacheByElementId($elementId, $iblockId) {
     $tagged->clearByTag('element_' . $elementId);
     echo "Тегированный кэш очищен.\n";
 
-    echo "Конец clearHtmlCacheByElementId для элемента ID: {$elementId}\n";
+    // echo "Конец clearHtmlCacheByElementId для элемента ID: {$elementId}\n";
 }
