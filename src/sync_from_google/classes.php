@@ -21,6 +21,23 @@ class StockQuery
         return $result;
     }
 
+    public function getBrandID(string $params)
+    {
+        $brandName = $params;
+
+        $sql = 'SELECT ID FROM b_iblock_element WHERE IBLOCK_ID = 14 AND ACTIVE = "Y" AND CODE = "'.$brandName.'"';
+
+        $connection = \Bitrix\Main\Application::getConnection();
+        $res = $connection->query($sql);
+   
+        // $result;
+        while ($row = $res->fetch()) {
+            $result = (object)$row;
+        }
+
+        return $result->ID;
+    }
+
     public function set(array $data)
     {
         $art = $data['art'];
