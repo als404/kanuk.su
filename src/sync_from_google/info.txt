@@ -1,24 +1,46 @@
-Рабочий скрипт (win1251) по обновлению наличия товаров на складе, данные берем из гугл таблицы, 
+Рабочий скрипт (UTF8) по обновлению наличия товаров на складе, данные берем из гугл таблицы, 
 кэшируем данные и проверяем на изменение наличия на складе, если товаров стало 0 или стало больше 0 записываем ID товара в массив, 
 затем обновляем наличие, после этого удаляем кэш html-страниц у товаров которые попали в массив для обновления
 
-класс для выполнения SQL-запросов  StockQuery содержит в себе методы GET и SET
+класс для выполнения SQL-запросов  StockQuery содержит в себе методы GET(получения остатков у товара), getBrandID (получения ID бренда) и SET (обновление остатков)
 
 $id = '1DDMulcd1VOjMaF9N_pCOfiQUqEs9HWbi96bdXDouOmM'; // Id документа
-$gid = '1078493664'; // Id листа
-$range = 'D325:H330'; // диапазон страниц
+$iblock_id = 51;
+$facet_id = 104;
+
+$data['resource'] = [
+    [
+    'docId' => $id,
+    'listId' => '1078493664', 
+    'range' => 'D3:H350',
+    'brandName' => 'BREXIT', 
+    'iblock_id' => $iblock_id,
+    'facet_id' => $facet_id,
+    ],
+    [
+    'docId' => $id,
+    'listId' => '1145536272',
+    'range' => 'D4:H40',
+    'brandName' => 'Esson', 
+    'iblock_id' => $iblock_id,
+    'facet_id' => $facet_id,
+    ],
+];
 
 Функция для загрузки данных из Google Sheets 
 fetchGoogleSheetData(string $id, string $gid, string $range)
 
+Функция которая получает ID бренда по имени бренда
+function getBrandId(string $name)
+
 Функция проверки даты кэша файла 
-function checkingCacheDate(string $id, string $gid, string $range)
+function checkingCacheDate(array $data)
 
 Функция обновление остатков 
-function updateStock(array $data, string $brand_id, string $iblock_id, string $facet_id)
+function updateStock(array $data)
 
 Функция определение товаров, у которых изменилась доступность
-function processData(array $data, string $brand_id, string $iblock_id, string $facet_id)
+function processData(array $data)
 
 Функция для очистки кэша элемента и категорий
 function clearHtmlCacheByElementId($elementId, $iblockId)
