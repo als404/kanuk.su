@@ -25,26 +25,14 @@ function costHtml($value) {
 $message = '';
 $details = '';
 $isError = false;
-
-// Загружаем все активные бренды из инфоблока 14
+// Ручной CSV: все активные бренды инфоблока 14 (не только Google Sheets).
 $db = connectDb();
-
 $stmt = $db->prepare(
-    'SELECT ID, NAME, CODE
-     FROM b_iblock_element
-     WHERE IBLOCK_ID = ? AND ACTIVE = ?
-     ORDER BY NAME'
+    'SELECT ID, NAME, CODE FROM b_iblock_element WHERE IBLOCK_ID = ? AND ACTIVE = ? ORDER BY NAME'
 );
-
-$stmt->execute([
-    $c['brands_iblock_id'],
-    'Y'
-]);
-
+$stmt->execute([$c['brands_iblock_id'], 'Y']);
 $availableBrands = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 $selectedBrand = (string)($_POST['brand'] ?? '');
-
 $includeStock = !empty($_POST['include_stock']);
 $applyRequested = !empty($_POST['apply']);
 
@@ -54,20 +42,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!hash_equals($_SESSION['cost_import_csrf'], (string)($_POST['csrf'] ?? ''))) {
             throw new RuntimeException('Ошибка проверки формы. Обновите страницу и повторите попытку.');
         }
-        
         $brandFound = false;
-
         foreach ($availableBrands as $brandItem) {
             if ((string)$brandItem['ID'] === $selectedBrand) {
                 $brandFound = true;
                 break;
             }
         }
-
         if (!$brandFound) {
             throw new RuntimeException('Выберите корректный бренд.');
         }
-
         if (!isset($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK ||
             !is_uploaded_file($_FILES['csv']['tmp_name'])) {
             throw new RuntimeException('Не удалось получить CSV-файл.');
@@ -103,10 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         require_once __DIR__ . '/lib/runner.php';
         $dryRun = !$applyRequested;
-        $result = runBrands(
-            ['MANUAL:' . $selectedBrand => $rows],
-            $dryRun
-        );
+        $result = runBrands(['MANUAL:' . $selectedBrand => $rows], $dryRun);
         $message = $dryRun ? 'Проверка завершена — данные в БД не менялись.' :
             'Обновление завершено. Проверьте отчёт и очистку кэша.';
         $details = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -143,13 +124,31 @@ $APPLICATION->SetTitle('Обновление цен и остатков');
 .costui .notice.error {background:#fff0f0;border-color:#ebc4c4;color:#922b2b}
 .costui pre {white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;background:#f5f7f9;padding:15px;border-radius:5px;max-height:340px;overflow:auto}
 .costui .warning {font-size:13px;color:#76551d;background:#fff5dd;border-radius:5px;padding:13px 16px;margin-top:18px}
+.costui details.report-toggle {border:1px solid #dbe2ea;border-radius:7px;overflow:hidden;background:#fff}
+.costui details.report-toggle > summary {cursor:pointer;padding:15px 19px;font-size:16px;font-weight:700;background:#f4f6f8;color:#28313b;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.costui details.report-toggle > summary::-webkit-details-marker {display:none}
+.costui details.report-toggle > summary::after {content:'▾';font-size:18px;flex:none;color:#667487}
+.costui details.report-toggle[open] > summary::after {content:'▴'}
+.costui details.report-toggle > summary:hover {background:#e9eef3}
+.costui details.report-toggle > summary:focus-visible {outline:2px solid #cc2660;outline-offset:-3px}
+.costui .report-body {padding:14px 18px}
+.costui .report-body pre {margin:0}
+.costui .notice details.report-toggle {margin-top:12px}
+.costui .notice details.report-toggle > summary {background:#f4f6f8}
+.costui .report-panel {margin-bottom:20px}
+
 @media (max-width:680px){.costui .form-grid{grid-template-columns:1fr}.costui .panel-body{padding:15px}}
 </style>
 <div class="costui">
     <?php if ($message !== ''): ?>
         <div class="notice<?= $isError ? ' error' : '' ?>">
             <strong><?= costHtml($message) ?></strong>
-            <?php if ($details !== ''): ?><pre><?= costHtml($details) ?></pre><?php endif; ?>
+            <?php if ($details !== ''): ?>
+                <details class="report-toggle">
+                    <summary>Подробный отчёт обработки</summary>
+                    <div class="report-body"><pre><?= costHtml($details) ?></pre></div>
+                </details>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
     <div class="panel">
@@ -164,25 +163,9 @@ $APPLICATION->SetTitle('Обновление цен и остатков');
                     <div>
                         <label class="caption" for="cost-brand">Бренд</label>
                         <select id="cost-brand" name="brand">
-                            <?php foreach ($c['brands'] as $brand => $settings): ?>
-                                
-                                <option value="">Выберите бренд...</option>
-
-                                <?php foreach ($availableBrands as $brandItem): ?>
-                                    <option
-                                        value="<?= (int)$brandItem['ID'] ?>"
-                                        <?= $selectedBrand === (string)$brandItem['ID']
-                                            ? 'selected'
-                                            : '' ?>
-                                    >
-                                        <?= costHtml(
-                                            $brandItem['CODE'] !== ''
-                                                ? $brandItem['CODE']
-                                                : $brandItem['NAME']
-                                        ) ?>
-                                    </option>
-                                <?php endforeach; ?>
-
+                            <option value="">Выберите бренд...</option>
+                            <?php foreach ($availableBrands as $brandItem): ?>
+                                <option value="<?= (int)$brandItem['ID'] ?>" <?= $selectedBrand === (string)$brandItem['ID'] ? 'selected' : '' ?>><?= costHtml($brandItem['CODE'] !== '' ? $brandItem['CODE'] : $brandItem['NAME']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -200,9 +183,9 @@ $APPLICATION->SetTitle('Обновление цен и остатков');
             </form>
         </div>
     </div>
-    <div class="panel">
-        <div class="panel-head">Последние события синхронизации</div>
-        <div class="panel-body">
+    <details class="report-toggle report-panel">
+        <summary>Последние события синхронизации</summary>
+        <div class="report-body">
             <?php
             $logPath = runtimeDir() . '/sync.log';
             if (is_file($logPath)) {
@@ -213,6 +196,6 @@ $APPLICATION->SetTitle('Обновление цен и остатков');
             }
             ?>
         </div>
-    </div>
+    </details>
 </div>
 <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog.php'; ?>
