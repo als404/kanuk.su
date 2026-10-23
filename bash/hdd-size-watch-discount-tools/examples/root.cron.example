@@ -1,0 +1,3 @@
+# Исторически hdd_size.sh запускался каждую минуту.
+# Рекомендуемая явная запись в root crontab:
+* * * * * /bin/bash /home/script/hdd_size.sh >> /home/script/logs/hdd_size.log 2>&1

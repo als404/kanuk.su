@@ -1,0 +1,14 @@
+# Local config / secrets
+hdd_size.conf
+.msmtprc
+*.env
+*.secret
+
+# Runtime
+*.log
+*.state
+
+# Editors / OS
+*.swp
+*.swo
+.DS_Store
