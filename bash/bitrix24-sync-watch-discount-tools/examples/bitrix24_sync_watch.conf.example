@@ -1,0 +1,21 @@
+# /etc/bitrix24_sync_watch.conf
+# SMTP password is NOT stored here. It remains in MSMTP_CONFIG.
+
+SITE_NAME="discount-tools.ru"
+
+ACCESS_LOG="/var/log/nginx/discount-tools.ru_access.log"
+B24_USER="bx_eshop"
+EXCHANGE_PATH="/bitrix/admin/1c_exchange.php"
+
+SYNC_PERIOD_MIN=10
+ALERT_AFTER=1500
+
+STATE_FILE="/var/tmp/bitrix24_sync_watch.state"
+MONITOR_LOG="/var/log/bitrix24_sync_watch.log"
+
+MSMTP="/usr/bin/msmtp"
+MSMTP_CONFIG="/home/bitrix/.msmtprc"
+MSMTP_ACCOUNT="discount-tools.ru"
+
+EMAIL_FROM="info@discount-tools.ru"
+EMAIL_TO="adm+site@kanuk.su"

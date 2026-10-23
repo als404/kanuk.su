@@ -1,0 +1,10 @@
+/var/log/bitrix24_sync_watch.log
+{
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

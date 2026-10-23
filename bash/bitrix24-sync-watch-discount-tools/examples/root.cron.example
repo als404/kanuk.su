@@ -1,0 +1,2 @@
+# Root crontab
+*/5 * * * * /usr/local/sbin/bitrix24_sync_watch.sh >/dev/null 2>&1

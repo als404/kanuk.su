@@ -1,0 +1,14 @@
+# Local configuration / secrets
+bitrix24_sync_watch.conf
+.msmtprc
+*.secret
+*.env
+
+# Runtime files
+*.log
+*.state
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
