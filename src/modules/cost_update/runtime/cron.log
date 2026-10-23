@@ -1,0 +1,25 @@
+
+Warning: file_put_contents(/var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/runtime/sync.log): failed to open stream: Permission denied in /var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/lib/common.php on line 4
+2026-10-23T10:42:53+00:00 WARNING Duplicate articles in BREXIT (last row used): 2111027, 4000504, 4000506, 4000514, 4000516
+
+Warning: file_put_contents(/var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/runtime/sync.log): failed to open stream: Permission denied in /var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/lib/common.php on line 4
+2026-10-23T10:42:53+00:00 Parsed BREXIT: 1148 usable rows; 0 invalid rows
+
+Warning: file_put_contents(/var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/runtime/sync.log): failed to open stream: Permission denied in /var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/lib/common.php on line 4
+2026-10-23T10:42:53+00:00 Parsed ESSON: 81 usable rows; 0 invalid rows
+
+Warning: file_put_contents(/var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/runtime/sync.log): failed to open stream: Permission denied in /var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/lib/common.php on line 4
+2026-10-23T10:42:54+00:00 UPDATED BREXIT {"rows":1148,"missing":146,"ambiguous":0,"price":0,"stock":0,"unchanged":1002}
+
+Warning: file_put_contents(/var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/runtime/sync.log): failed to open stream: Permission denied in /var/www/kanuk/data/www/kanuk.brexit.by/local/modules/cost_update/lib/common.php on line 4
+2026-10-23T10:42:54+00:00 UPDATED ESSON {"rows":81,"missing":15,"ambiguous":0,"price":0,"stock":0,"unchanged":66}
+2026-10-23T10:46:13+00:00 WARNING Duplicate articles in BREXIT (last row used): 2111027, 4000504, 4000506, 4000514, 4000516
+2026-10-23T10:46:13+00:00 Parsed BREXIT: 1148 usable rows; 0 invalid rows
+2026-10-23T10:46:13+00:00 Parsed ESSON: 81 usable rows; 0 invalid rows
+2026-10-23T10:46:14+00:00 UPDATED BREXIT {"rows":1148,"missing":146,"ambiguous":0,"price":0,"stock":0,"unchanged":1002}
+2026-10-23T10:46:14+00:00 UPDATED ESSON {"rows":81,"missing":15,"ambiguous":0,"price":0,"stock":0,"unchanged":66}
+2026-10-23T10:49:03+00:00 WARNING Duplicate articles in BREXIT (last row used): 2111027, 4000504, 4000506, 4000514, 4000516
+2026-10-23T10:49:03+00:00 Parsed BREXIT: 1148 usable rows; 0 invalid rows
+2026-10-23T10:49:04+00:00 Parsed ESSON: 81 usable rows; 0 invalid rows
+2026-10-23T10:49:04+00:00 UPDATED BREXIT {"rows":1148,"missing":146,"ambiguous":0,"price":0,"stock":0,"unchanged":1002}
+2026-10-23T10:49:04+00:00 UPDATED ESSON {"rows":81,"missing":15,"ambiguous":0,"price":0,"stock":0,"unchanged":66}

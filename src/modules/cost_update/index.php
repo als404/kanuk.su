@@ -1,59 +1,218 @@
-<?php 
-require_once($_SERVER["DOCUMENT_ROOT"]."/bitrix/modules/main/include/prolog.php");
+<?php
+// Р СѓС‡РЅР°СЏ Р·Р°РіСЂСѓР·РєР° CSV. PHP 7.4 / Р‘РёС‚СЂРёРєСЃ.
+require_once __DIR__ . '/lib/common.php';
+$c = cfg();
+$_SERVER['DOCUMENT_ROOT'] = rtrim($c['document_root'], '/');
+require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/prolog.php';
 
 global $USER;
-if($USER->IsAdmin()) {
-    require_once('core.php');
-?>
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="style/main.css">
-
-    
-            <div class="card">
-                <div class="card-header">
-                    Обновление цен и наличия на складе в БД из файла CSV
-                </div>
-                <div class="card-body">
-                    <h5 class="card-title">Внимание!</h5>
-                    <p class="card-text">Структура файла должна быть в соответствии со спецификацией, артикул должен быть заполнен обязательно, остальные поля, если содержат пустое значение либо 0 либо другое значение не являющееся целым числом либо float числом будут означать 0. </p>
-                    <p>Если вы собираетесь обновить наличие товара на складе, добавьте эти данные в CVS файл в соответствии с примером и установите кнопку "Учитывать наличие" в активное положение!</p>
-                    <div class="alert alert-info mt-3">пример оформления файла CSV: { артикул;стоимость;кол-во; }</div>
-                    <?php require_once(BASE .'/inc/form.php'); ?>
-
-                    <div class="alert alert-warning mt-3">
-                        <p>После обновления цен требуется обязательно сбросить весь кеш сайта, иначе будут показываться старые цены!!!</p>
-                        <p><small>Перейдите по ссылке <a href="https://discount-tools.ru/bitrix/admin/cache.php?lang=ru">"Очистка файлов кеша"</a> на страницу "Настройки кеширования" на вкладке "Очистистка файлов кеша" выбирете пункт "Все" и нажмите кнопку "Начать". Дождитесть окончания работы по удалению кеша.</small></p>
-                    </div>
-                    <div class="alert alert-success mt-3" role="alert" style="display:none"></div>
-                    <div class="alert alert-danger mt-3" role="alert" style="display:none"></div>
-                </div>
-            </div>
-
-    <div class="align-self-end">
-        <div class="container mt-3">&copy; 2016-<?php echo date('Y'); ?> All rights reserved. www.qwedy.com</div>
-    </div>
-
-    <script src="js/main.js"></script>
-
-<?php 
-} else {
-?>
-    <style>
-        .auth .kabinet a.login_anch span, .kabinet a.personal span {color:#555;}
-        .auth .kabinet .register {display:none;}
-    </style>
-    <div class="auth"><h2>Вы не авторизированны, либо у вас нет прав для просмотра данной страницы!</h2>
-<?
-    define("NEED_AUTH", true);
-    $APPLICATION->IncludeComponent("bitrix:main.include", "", array("AREA_FILE_SHOW" => "file", "PATH" => SITE_DIR."include/registration.php"), false);
-?>
-    </div>
-<?
-} 
-
-if(defined("B_PROLOG_INCLUDED") && B_PROLOG_INCLUDED===true) { 
-   require_once($_SERVER["DOCUMENT_ROOT"]."/bitrix/modules/main/include/epilog.php"); 
+if (!is_object($USER) || !$USER->IsAdmin()) {
+    http_response_code(403);
+    exit('Р”РѕСЃС‚СѓРї СЂР°Р·СЂРµС€С‘РЅ С‚РѕР»СЊРєРѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂСѓ.');
 }
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+if (empty($_SESSION['cost_import_csrf'])) {
+    $_SESSION['cost_import_csrf'] = bin2hex(random_bytes(24));
+}
+
+function costHtml($value) {
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+$message = '';
+$details = '';
+$isError = false;
+
+// Р—Р°РіСЂСѓР¶Р°РµРј РІСЃРµ Р°РєС‚РёРІРЅС‹Рµ Р±СЂРµРЅРґС‹ РёР· РёРЅС„РѕР±Р»РѕРєР° 14
+$db = connectDb();
+
+$stmt = $db->prepare(
+    'SELECT ID, NAME, CODE
+     FROM b_iblock_element
+     WHERE IBLOCK_ID = ? AND ACTIVE = ?
+     ORDER BY NAME'
+);
+
+$stmt->execute([
+    $c['brands_iblock_id'],
+    'Y'
+]);
+
+$availableBrands = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$selectedBrand = (string)($_POST['brand'] ?? '');
+
+$includeStock = !empty($_POST['include_stock']);
+$applyRequested = !empty($_POST['apply']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    ob_start();
+    try {
+        if (!hash_equals($_SESSION['cost_import_csrf'], (string)($_POST['csrf'] ?? ''))) {
+            throw new RuntimeException('РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё С„РѕСЂРјС‹. РћР±РЅРѕРІРёС‚Рµ СЃС‚СЂР°РЅРёС†Сѓ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.');
+        }
+        
+        $brandFound = false;
+
+        foreach ($availableBrands as $brandItem) {
+            if ((string)$brandItem['ID'] === $selectedBrand) {
+                $brandFound = true;
+                break;
+            }
+        }
+
+        if (!$brandFound) {
+            throw new RuntimeException('Р’С‹Р±РµСЂРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ Р±СЂРµРЅРґ.');
+        }
+
+        if (!isset($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK ||
+            !is_uploaded_file($_FILES['csv']['tmp_name'])) {
+            throw new RuntimeException('РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ CSV-С„Р°Р№Р».');
+        }
+        if ($_FILES['csv']['size'] > 10 * 1024 * 1024) {
+            throw new RuntimeException('Р Р°Р·РјРµСЂ CSV РїСЂРµРІС‹С€Р°РµС‚ 10 РњР‘.');
+        }
+        $content = file_get_contents($_FILES['csv']['tmp_name']);
+        if ($content === false) {
+            throw new RuntimeException('РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ CSV-С„Р°Р№Р».');
+        }
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            $converted = iconv('Windows-1251', 'UTF-8//IGNORE', $content);
+            if ($converted === false) {
+                throw new RuntimeException('РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРµРѕР±СЂР°Р·РѕРІР°С‚СЊ РєРѕРґРёСЂРѕРІРєСѓ CSV.');
+            }
+            $content = $converted;
+        }
+        $rawRows = rowsFromCsvString($content, ';');
+        $rows = extractRows($rawRows, [
+            'article_index' => 0,
+            'price_index' => 1,
+            'stock_index' => 2,
+        ], $selectedBrand);
+        if (!$includeStock) {
+            foreach ($rows as &$row) {
+                $row['qty'] = null;
+            }
+            unset($row);
+        }
+        if (!$rows) {
+            throw new RuntimeException('Р’ С„Р°Р№Р»Рµ РЅРµС‚ СЃС‚СЂРѕРє СЃ РґР°РЅРЅС‹РјРё РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ.');
+        }
+        require_once __DIR__ . '/lib/runner.php';
+        $dryRun = !$applyRequested;
+        $result = runBrands(
+            ['MANUAL:' . $selectedBrand => $rows],
+            $dryRun
+        );
+        $message = $dryRun ? 'РџСЂРѕРІРµСЂРєР° Р·Р°РІРµСЂС€РµРЅР° вЂ” РґР°РЅРЅС‹Рµ РІ Р‘Р” РЅРµ РјРµРЅСЏР»РёСЃСЊ.' :
+            'РћР±РЅРѕРІР»РµРЅРёРµ Р·Р°РІРµСЂС€РµРЅРѕ. РџСЂРѕРІРµСЂСЊС‚Рµ РѕС‚С‡С‘С‚ Рё РѕС‡РёСЃС‚РєСѓ РєСЌС€Р°.';
+        $details = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $exception) {
+        $isError = true;
+        $message = 'РћС€РёР±РєР°: ' . $exception->getMessage();
+    }
+    $output = trim(ob_get_clean());
+    if ($output !== '') {
+        $details .= ($details === '' ? '' : "\n\n") . $output;
+    }
+}
+
+// РЎС‚СЂР°РЅРёС†Р° РёСЃРїРѕР»СЊР·СѓРµС‚ РѕР±С‰РёР№ С€Р°Р±Р»РѕРЅ СЃР°Р№С‚Р°; Р·Р°РіСЂСѓР·РєР° СЏРґСЂР° РґРѕРїСѓСЃС‚РёРјР° С‚РѕР»СЊРєРѕ РґР»СЏ СЂСѓС‡РЅРѕРіРѕ СЂРµР¶РёРјР°.
+$APPLICATION->SetTitle('РћР±РЅРѕРІР»РµРЅРёРµ С†РµРЅ Рё РѕСЃС‚Р°С‚РєРѕРІ');
+// РЁР°РїРєР° Рё С€Р°Р±Р»РѕРЅ СЃР°Р№С‚Р° СѓР¶Рµ РїРѕРґРєР»СЋС‡РµРЅС‹ С‡РµСЂРµР· РїРѕР»РЅС‹Р№ prolog.php.
 ?>
+<style>
+.costui {max-width:960px;margin:24px auto 52px;font-family:Arial,sans-serif;color:#28313b}
+.costui * {box-sizing:border-box}
+.costui .panel {border:1px solid #dbe2ea;border-radius:9px;background:#fff;margin-bottom:20px;overflow:hidden}
+.costui .panel-head {padding:17px 22px;font-weight:700;background:#f4f6f8;border-bottom:1px solid #e2e6eb;font-size:18px}
+.costui .panel-body {padding:22px}
+.costui .help {color:#526270;line-height:1.6;font-size:14px;margin:0 0 17px}
+.costui .hint {padding:13px 16px;border-radius:5px;background:#eaf7fc;color:#245066;margin:0 0 22px}
+.costui .form-grid {display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:18px}
+.costui label.caption {display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+.costui select,.costui input[type=file] {width:100%;max-width:100%;padding:12px;border:1px solid #cbd4df;border-radius:5px;background:white;font-size:14px}
+.costui .checks {display:flex;flex-wrap:wrap;gap:24px;align-items:center;margin:20px 0}
+.costui .checks label {display:flex;gap:9px;align-items:center;cursor:pointer}
+.costui .checks input {width:17px;height:17px}
+.costui button {padding:12px 24px;background:#cc2660;color:#fff;border:0;border-radius:5px;font-size:15px;font-weight:600;cursor:pointer}
+.costui .notice {border:1px solid #b5d7b7;background:#eff9ef;border-radius:5px;padding:14px 16px;margin-bottom:20px}
+.costui .notice.error {background:#fff0f0;border-color:#ebc4c4;color:#922b2b}
+.costui pre {white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;background:#f5f7f9;padding:15px;border-radius:5px;max-height:340px;overflow:auto}
+.costui .warning {font-size:13px;color:#76551d;background:#fff5dd;border-radius:5px;padding:13px 16px;margin-top:18px}
+@media (max-width:680px){.costui .form-grid{grid-template-columns:1fr}.costui .panel-body{padding:15px}}
+</style>
+<div class="costui">
+    <?php if ($message !== ''): ?>
+        <div class="notice<?= $isError ? ' error' : '' ?>">
+            <strong><?= costHtml($message) ?></strong>
+            <?php if ($details !== ''): ?><pre><?= costHtml($details) ?></pre><?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <div class="panel">
+        <div class="panel-head">Р СѓС‡РЅРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ С†РµРЅ Рё РѕСЃС‚Р°С‚РєРѕРІ РёР· CSV</div>
+        <div class="panel-body">
+            <p class="help">Р’С‹Р±РµСЂРёС‚Рµ Р±СЂРµРЅРґ, Р·Р°РіСЂСѓР·РёС‚Рµ CSV-С„Р°Р№Р» Рё СЃРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ РїСЂРѕРІРµСЂРєСѓ Р±РµР· Р·Р°РїРёСЃРё. РўРѕРІР°СЂС‹ РёС‰СѓС‚СЃСЏ РїРѕ Р°СЂС‚РёРєСѓР»Сѓ РІ РїСЂРµРґРµР»Р°С… РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р±СЂРµРЅРґР°.</p>
+            <div class="hint">Р¤РѕСЂРјР°С‚: <strong>Р°СЂС‚РёРєСѓР»;СЃС‚РѕРёРјРѕСЃС‚СЊ;РєРѕР»-РІРѕ</strong><br>
+                РџСѓСЃС‚С‹Рµ Р·РЅР°С‡РµРЅРёСЏ РЅРµ РёР·РјРµРЅСЏСЋС‚ РґР°РЅРЅС‹Рµ. Р¦РµРЅР° РѕРєСЂСѓРіР»СЏРµС‚СЃСЏ РґРѕ С†РµР»РѕРіРѕ СЂСѓР±Р»СЏ. РћС‚СЂРёС†Р°С‚РµР»СЊРЅС‹Р№ РѕСЃС‚Р°С‚РѕРє РїСЂРµРѕР±СЂР°Р·СѓРµС‚СЃСЏ РІ 0.</div>
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf" value="<?= costHtml($_SESSION['cost_import_csrf']) ?>">
+                <div class="form-grid">
+                    <div>
+                        <label class="caption" for="cost-brand">Р‘СЂРµРЅРґ</label>
+                        <select id="cost-brand" name="brand">
+                            <?php foreach ($c['brands'] as $brand => $settings): ?>
+                                
+                                <option value="">Р’С‹Р±РµСЂРёС‚Рµ Р±СЂРµРЅРґ...</option>
+
+                                <?php foreach ($availableBrands as $brandItem): ?>
+                                    <option
+                                        value="<?= (int)$brandItem['ID'] ?>"
+                                        <?= $selectedBrand === (string)$brandItem['ID']
+                                            ? 'selected'
+                                            : '' ?>
+                                    >
+                                        <?= costHtml(
+                                            $brandItem['CODE'] !== ''
+                                                ? $brandItem['CODE']
+                                                : $brandItem['NAME']
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
+
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="caption" for="cost-file">CSV-С„Р°Р№Р»</label>
+                        <input type="file" id="cost-file" name="csv" accept=".csv,text/csv" required>
+                    </div>
+                </div>
+                <div class="checks">
+                    <label><input type="checkbox" name="include_stock" value="1" <?= $includeStock ? 'checked' : '' ?>> РЈС‡РёС‚С‹РІР°С‚СЊ РѕСЃС‚Р°С‚РєРё</label>
+                    <label><input type="checkbox" name="apply" value="1" > Р’С‹РїРѕР»РЅРёС‚СЊ Р·Р°РїРёСЃСЊ РІ MySQL</label>
+                </div>
+                <button type="submit">Р—Р°РїСѓСЃС‚РёС‚СЊ РѕР±СЂР°Р±РѕС‚РєСѓ</button>
+                <div class="warning"><strong>Р‘РµР· РіР°Р»РѕС‡РєРё В«Р’С‹РїРѕР»РЅРёС‚СЊ Р·Р°РїРёСЃСЊВ»</strong> Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ DRY-RUN. Р“Р°Р»РѕС‡РєР° СЂР°Р·СЂРµС€Р°РµС‚ СЂРµР°Р»СЊРЅРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ С‚РѕРІР°СЂРѕРІ Рё РїРѕСЃР»РµРґСѓСЋС‰СѓСЋ РѕС‡РёСЃС‚РєСѓ РєСЌС€Р°.</div>
+            </form>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-head">РџРѕСЃР»РµРґРЅРёРµ СЃРѕР±С‹С‚РёСЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё</div>
+        <div class="panel-body">
+            <?php
+            $logPath = runtimeDir() . '/sync.log';
+            if (is_file($logPath)) {
+                $log = file($logPath, FILE_IGNORE_NEW_LINES);
+                echo '<pre>' . costHtml(implode("\n", array_slice($log ?: [], -35))) . '</pre>';
+            } else {
+                echo '<p class="help">Р—Р°РїРёСЃРµР№ РїРѕРєР° РЅРµС‚.</p>';
+            }
+            ?>
+        </div>
+    </div>
+</div>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/bitrix/modules/main/include/epilog.php'; ?>
