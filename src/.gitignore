@@ -1,0 +1,2 @@
+# cost_update: runtime files (logs, locks, queue, temporary data)
+cost_update/runtime/
