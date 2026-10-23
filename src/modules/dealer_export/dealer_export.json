@@ -1,0 +1,25 @@
+{
+  "site_root": "/var/www/kanuk/data/www/kanuk.brexit.by",
+  "expected_database": "kanuk_utf8",
+  "base_url": "https://kanuk.brexit.by",
+  "output_dir": "/var/www/kanuk/data/www/kanuk.brexit.by/dealer-export",
+  "log_file": "/var/www/kanuk/data/www/kanuk.brexit.by/local/var/log/dealer_export.log",
+  "lock_file": "/tmp/kanuk-dealer-export.lock",
+  "product_iblock_id": 16,
+  "manufacturer_property_id": 52,
+  "article_property_id": 51,
+  "more_photo_property_id": 50,
+  "price_group_id": 1,
+  "characteristics_min_sort": 100,
+  "fallback_measure_symbol": "шт",
+  "brands": {
+    "BREXIT": {
+      "manufacturer_id": 267,
+      "file": "brexit.xml"
+    },
+    "ESSON": {
+      "manufacturer_id": 3688,
+      "file": "esson.xml"
+    }
+  }
+}
