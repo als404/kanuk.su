@@ -1,0 +1,3 @@
+# root crontab (crontab -e), время по часовому поясу сервера.
+# Установить только после проверки ручного --all. Не дублировать в панели.
+0 1 * * * /home/script/backup.sh --all >> /home/script/logs/backup_cron.log 2>&1

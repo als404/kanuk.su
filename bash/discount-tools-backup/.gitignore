@@ -1,0 +1,26 @@
+# Рабочая конфигурация и секреты
+backup.conf
+inc/
+.msmtprc
+*.netrc
+.env
+.env.*
+!.env.example
+# Результаты и временные файлы
+logs/
+*.log
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.part
+.backup_v2_work/
+*.stderr
+*.stats
+# Редакторы и ОС
+*.swp
+*.swo
+*~
+.DS_Store

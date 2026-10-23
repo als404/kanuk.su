@@ -1,0 +1,13 @@
+# Bash-конфигурация. Скопировать в /home/script/inc/backup.conf, chmod 600.
+# Используйте одинарные кавычки; если пароль содержит ', корректно экранируйте его.
+DIR_SITE='/var/www/example/public_html'
+DIR_BACKUP='/var/backups/example'
+DB_HOST='localhost'
+DB_USER='CHANGE_ME'
+DB_PASS='CHANGE_ME'
+DB_NAME='CHANGE_ME'
+FTP_IP='ftp.example.invalid'
+FTP_USER='CHANGE_ME'
+FTP_PASS='CHANGE_ME'
+# Каталог относительно FTP-корня; создайте заранее. Без пробелов и спецсимволов URL.
+FTP_DIR='site-backups'
