@@ -1,0 +1,16 @@
+-- Run ONLY on VM 247 database kanuk_utf8, after backup.
+-- Does not modify Bitrix tables or existing product property values.
+CREATE TABLE IF NOT EXISTS dt_cp_section_config (
+  SECTION_ID INT NOT NULL PRIMARY KEY,
+  CREATED_AT TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS dt_cp_section_property (
+  SECTION_ID INT NOT NULL,
+  PROPERTY_ID INT NOT NULL,
+  SORT_ORDER INT NOT NULL DEFAULT 100,
+  CREATED_AT TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (SECTION_ID, PROPERTY_ID),
+  KEY ix_dt_cp_property (PROPERTY_ID),
+  KEY ix_dt_cp_sort (SECTION_ID, SORT_ORDER)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;

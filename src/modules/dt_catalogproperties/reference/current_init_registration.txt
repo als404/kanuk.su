@@ -1,0 +1,46 @@
+// DT Catalog Properties — административная карточка товара.
+if (
+    isset($_SERVER['SCRIPT_NAME'])
+    && basename($_SERVER['SCRIPT_NAME']) === 'iblock_element_edit.php'
+) {
+    $dtAdminPropertiesFile =
+        $_SERVER['DOCUMENT_ROOT'] .
+        '/local/modules/dt.catalogproperties/lib/AdminElementProperties.php';
+
+    if (is_file($dtAdminPropertiesFile)) {
+        require_once $dtAdminPropertiesFile;
+
+        AddEventHandler(
+            'main',
+            'OnAdminTabControlBegin',
+            array(
+                '\DT\CatalogProperties\AdminElementProperties',
+                'onAdminTabControlBegin'
+            )
+        );
+    }
+}
+
+// DT Catalog Properties — пункт административного меню.
+if (defined('ADMIN_SECTION') && ADMIN_SECTION === true) {
+    $dtAdminMenuFile =
+        $_SERVER['DOCUMENT_ROOT'] .
+        '/local/modules/dt.catalogproperties/lib/AdminMenu.php';
+
+    if (is_file($dtAdminMenuFile)) {
+        require_once $dtAdminMenuFile;
+
+        AddEventHandler(
+            'main',
+            'OnBuildGlobalMenu',
+            array(
+                '\DT\CatalogProperties\AdminMenu',
+                'onBuildGlobalMenu'
+            ),
+            10000
+        );
+
+    }
+}
+
+?>
