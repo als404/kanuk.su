@@ -1,0 +1,5 @@
+# Install to /etc/cron.d/discount-webp; root:root 0644.
+# DT_WEBP_CRON
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+*/5 * * * * discount /usr/bin/nice -n 10 /usr/bin/ionice -c 3 /opt/discount-tools/webp-venv/bin/python /opt/discount-tools/image-webp/webp_convert.py --root /var/www/discount-tools/public/upload/resize_cache --root /var/www/discount-tools/public/upload/iblock --limit 50 --lock-file /var/lib/discount-tools/image-webp/converter.lock --state-db /var/lib/discount-tools/image-webp/state.sqlite3 --apply >> /var/log/discount-tools/webp-cron.log 2>&1

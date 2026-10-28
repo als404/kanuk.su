@@ -1,12 +1,52 @@
-# Deployment checklist (staging → production)
+# Перенос WebP-оптимизации на другой хостинг / домен
 
-1. Inventory actual paths, OS, Python, Pillow/WebP support and free disk space on target hosting. Do not reuse VM 247 paths without verification.
-2. Put script outside web root, e.g. `/opt/discount-tools/image-webp/webp_convert.py`; use a dedicated Python virtual environment and least-privilege account.
-3. Check ownership, ACL and SELinux of `/upload/iblock` and `/upload/resize_cache`. Ensure safe atomic file creation by that account; no recursive permissions changes.
-4. On copied small pilot JPEG/PNG inputs, run dry-run then `--apply`; inspect image quality and compare byte size, transparency and dimensions.
-5. Check full Nginx server block (all `location` rules, cache/ETag headers and upstream/CDN). Implement optional WebP negotiation only for image URLs; never bypass PHP execution denials or static access protections.
-6. Verify `curl` with and without `Accept: image/webp` on JPG and PNG, absence of WebP sidecar fallback, content type, `Vary: Accept`, Basic Auth behavior (staging), PDF delivery, cache consistency and response after cache clear.
-7. Enable limited batch with monitoring before any cron. Measure CPU/disk and error logs; test updates to existing files.
-8. Rollback Nginx rules and stop cron if needed. Keep originals and DB untouched; sidecar WebP files may be removed later under controlled policy.
+## 1. Сверка окружения до изменений
 
-Note: production's PHP / character encoding are not involved in the converter because it runs outside Bitrix, but target hosting paths and access rules must be checked independently.
+- Уточнить **реальные** `DOCROOT`, домен, версии Nginx и Python, путь к venv, пользователя PHP/web и права на `/upload`.
+- Проверить, что хостинг позволяет менять конфигурацию Nginx, создавать cron и запускать Python/Pillow. Это не решение для shared-хостинга без нужных доступов.
+- Проверить свободное место: WebP создаются **в дополнение** к оригиналам, хотя сокращают объём передачи по сети.
+- Определить SELinux/ACL/файловые контексты. На VM 247 AlmaLinux 9.8, Nginx 1.20.1, Python 3.9 + Pillow 11.3.0, SELinux Enforcing; на production параметры могут отличаться.
+- Сделать резервные копии Nginx, файлов планировщика, содержимого upload и существующего состояния (если оно есть).
+
+## 2. Состав и местоположение файлов
+
+Скопировать `webp_convert.py`, `full_convert.sh` в каталог вне web-root `/opt/discount-tools/image-webp/`. Создать Python venv с Pillow (проверить `features.check('webp')`). Создать `/var/lib/discount-tools/image-webp/` и `/var/log/discount-tools/` с владельцем пользователя конвертера.
+
+Настроить новые пути в **трёх** файлах перед развёртыванием: `full_convert.sh`, `cron/discount-webp`, `nginx/server-webp-location.conf` (последний предполагает URL-префиксы `/upload/...`). Изменить пользователя `discount`, если на новом хостинге иной владелец загрузок. Нельзя менять владельца upload целиком без проверки эксплуатации Битрикс.
+
+SQLite-файл переносить необязательно. При смене абсолютного пути исходников предпочтительно создать пустую новую БД, а ранее созданные sidecar-файлы будут пропускаться по `mtime`, если актуальны.
+
+## 3. Nginx (обязательно до массового включения)
+
+- Разместить `nginx/00-webp-map.conf` в директории включений **контекста `http`**. Убедиться в этом по `nginx -T`.
+- Вставить `nginx/server-webp-location.conf` **в нужный HTTPS `server {}`** до последнего `location /`, проверить пересечения с другими regex location, ограничения доступа, PHP-deny и `X-Robots-Tag` (если используется).
+- Для тестовой VM отдельные блоки `location` требуют собственного `add_header X-Robots-Tag ... always;`, чтобы не потерять унаследованный запрет индексации. Для production настройка отличается.
+- Сохранить базовую защиту PHP в `/upload`, запреты на служебные файлы и другие правила сайта.
+- `sudo nginx -t`, затем только после успешной проверки `sudo systemctl reload nginx`.
+- HTTP-проверки: `Accept: image/webp` → `Content-Type: image/webp`; `Accept: image/jpeg` → исходник; без sidecar → исходник; PDF → `application/pdf`; учитывать Basic Auth и CDN.
+
+## 4. Первичная ручная обработка после переноса
+
+1. **Не включать cron**, либо временно переименовать `/etc/cron.d/discount-webp` в `.disabled`.
+2. Проверить права на запись в обоих upload-каталогах и каталоге SQLite.
+3. Выполнить тестовый dry-run (см. `README.md`).
+4. Запустить `full_convert.sh` от владельца upload `discount`, перенаправляя вывод внутри оболочки этого пользователя.
+5. Проверить код завершения, итоговый JSON в `/var/log/discount-tools/webp-full.log`, количество WebP, наличие ошибок и качество выбранных изображений.
+6. При прерывании запустить повторно: уже обработанные версии будут пропущены.
+7. Установить cron из `cron/discount-webp`, владельца `root:root`, права `644`, проверить `crond`; наблюдать несколько фактических запусков.
+
+## 5. Журналы
+
+Установить `logrotate/discount-webp` в `/etc/logrotate.d/discount-webp`. Проверить `sudo logrotate -d /etc/logrotate.d/discount-webp`; `-d` — только симуляция. Убедиться, что каталог логов доступен пользователю запуска. `copytruncate` может потерять отдельные строки в момент ротации.
+
+## 6. Откат
+
+- Отключить cron (`mv /etc/cron.d/discount-webp /etc/cron.d/discount-webp.disabled`).
+- Вернуть сохранённую конфигурацию Nginx и проверить `nginx -t`, затем `reload`.
+- Оригиналы JPG/PNG/PDF не изменялись; сайт продолжит выдавать их даже при отключении WebP. **Не удалять файлы `*.webp` или SQLite массовыми командами до отдельной проверки.**
+
+## 7. Проверка на VM 247 (28 октября 2026)
+
+Полный ручной запуск: `scanned=18919`, `attempted=18719`, `created=18638`, `not_smaller_enough=81`, `up_to_date=200`, `saved_bytes=1140631795`. Это примерно 1.14 GB суммарного уменьшения размера выбранных изображений **при передаче WebP вместо оригиналов**, а не экономия места на сервере. После запуска необходимо вернуть cron, если он был отключён.
+
+Этот пакет фиксирует результат тестового развёртывания; **production не изменялся**.

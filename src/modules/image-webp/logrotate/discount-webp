@@ -1,0 +1,10 @@
+/var/log/discount-tools/webp-cron.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    su discount discount
+}
