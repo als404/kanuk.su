@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # backup.sh — резервное копирование сайта Bitrix + MySQL на FTP
-# Версия 2.1-stream-log (диагностика tar/curl)
+# Версия 2.1-stream
 #
 # Основная идея:
 #   1) рабочий кэш сайта НЕ очищается;
@@ -51,10 +51,6 @@ MAIL_ON_SUCCESS=0
 
 EMAIL_TO="adm+site@kanuk.su"
 EMAIL_FROM="info@discount-tools.ru"
-
-MSMTP="/usr/bin/msmtp"
-MSMTP_CONFIG="/home/bitrix/.msmtprc"
-MSMTP_ACCOUNT="discount-tools.ru"
 
 BACKUP_PREFIX="kanuk"
 
@@ -209,13 +205,8 @@ send_email() {
     local subject_b64
     local rc
 
-    if [ ! -x "$MSMTP" ]; then
-        log "ERROR: msmtp не найден: $MSMTP"
-        return 1
-    fi
-
-    if [ ! -r "$MSMTP_CONFIG" ]; then
-        log "ERROR: недоступен конфиг msmtp: $MSMTP_CONFIG"
+    if [ ! -x /usr/sbin/sendmail ]; then
+        log "ERROR: sendmail не найден"
         return 1
     fi
 
@@ -231,15 +222,12 @@ send_email() {
         echo "Content-Transfer-Encoding: base64"
         echo
         printf '%s' "$body" | base64
-    } | "$MSMTP" \
-        -C "$MSMTP_CONFIG" \
-        -a "$MSMTP_ACCOUNT" \
-        -t
+    } | /usr/sbin/sendmail -f "$EMAIL_FROM" -t -i
     rc=$?
     set -e
 
     if [ "$rc" -ne 0 ]; then
-        log "ERROR: msmtp завершился с кодом $rc"
+        log "ERROR: sendmail завершился с кодом $rc"
         return "$rc"
     fi
 
@@ -725,66 +713,44 @@ stream_full_backup_to_ftp() {
     # Большой tar.gz НЕ создаётся локально.
     # -C "$DIR_SITE" . включает скрытые файлы, в том числе .htaccess.
     #
-    # Диагностика потока: stdout функции содержит только имя архива.
-    # Отключаем ERR только в диагностическом subshell; после записи деталей
-    # ненулевой код передаётся штатному обработчику ошибки.
-    size_upload="$(
-        trap - ERR
-        set +e
-        tar_err="$WORK_DIR/stream_tar.stderr"
-        curl_err="$WORK_DIR/stream_curl.stderr"
-        stats_file="$WORK_DIR/stream_curl.stats"
-        stream_started=$(date +%s)
-        priority=(nice -n 10)
-        if command -v ionice >/dev/null 2>&1; then
-            priority=(ionice -c2 -n7 nice -n 10)
-        fi
-
-        "${priority[@]}" tar -czf - \
-            "${TAR_EXCLUDES[@]}" \
-            -C "$DIR_SITE" . \
-            -C "$WORK_DIR" __backup 2>"$tar_err" \
-        | curl \
-            --silent \
-            --show-error \
-            --fail \
-            --connect-timeout 20 \
-            --netrc-file "$NETRC_FILE" \
-            -T - \
-            -o /dev/null \
-            -w '%{size_upload}' \
-            "$upload_url" >"$stats_file" 2>"$curl_err"
-        stream_status=("${PIPESTATUS[@]}")
-        tar_rc=${stream_status[0]}
-        curl_rc=${stream_status[1]}
-        sent_bytes=$(cat "$stats_file")
-        stream_elapsed=$(( $(date +%s) - stream_started ))
-
-        log "STREAM RESULT: tar_exit=$tar_rc; curl_exit=$curl_rc; size_upload=${sent_bytes:-unknown} bytes; elapsed=${stream_elapsed}s"
-        for source in tar curl; do
-            if [ "$source" = tar ]; then
-                error_file="$tar_err"
-            else
-                error_file="$curl_err"
-            fi
-            if [ -s "$error_file" ]; then
-                while IFS= read -r error_line || [ -n "$error_line" ]; do
-                    log "STREAM $source stderr: $error_line"
-                done < "$error_file"
-            fi
-        done
-        rm -f -- "$tar_err" "$curl_err" "$stats_file"
-
-        # При обрыве curl tar может завершиться с SIGPIPE (141).
-        # В таком случае основным кодом ошибки считаем код curl.
-        if [ "$curl_rc" -ne 0 ]; then
-            exit "$curl_rc"
-        fi
-        if [ "$tar_rc" -ne 0 ]; then
-            exit "$tar_rc"
-        fi
-        printf '%s' "$sent_bytes"
-    )"
+    # curl возвращает количество реально переданных байт через size_upload.
+    if command -v ionice >/dev/null 2>&1; then
+        size_upload="$(
+            ionice -c2 -n7 nice -n 10 \
+                tar -czf - \
+                    "${TAR_EXCLUDES[@]}" \
+                    -C "$DIR_SITE" . \
+                    -C "$WORK_DIR" __backup \
+            | curl \
+                --silent \
+                --show-error \
+                --fail \
+                --connect-timeout 20 \
+                --netrc-file "$NETRC_FILE" \
+                -T - \
+                -o /dev/null \
+                -w '%{size_upload}' \
+                "$upload_url"
+        )"
+    else
+        size_upload="$(
+            nice -n 10 \
+                tar -czf - \
+                    "${TAR_EXCLUDES[@]}" \
+                    -C "$DIR_SITE" . \
+                    -C "$WORK_DIR" __backup \
+            | curl \
+                --silent \
+                --show-error \
+                --fail \
+                --connect-timeout 20 \
+                --netrc-file "$NETRC_FILE" \
+                -T - \
+                -o /dev/null \
+                -w '%{size_upload}' \
+                "$upload_url"
+        )"
+    fi
 
     if ! [[ "$size_upload" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
         log "ERROR: curl не вернул корректный size_upload: $size_upload"
@@ -995,12 +961,12 @@ run_check() {
         warnings=$((warnings + 1))
     fi
 
-    # msmtp
-    if [ -x "$MSMTP" ] && [ -r "$MSMTP_CONFIG" ]; then
-        echo "[OK]      msmtp: $MSMTP"
-        echo "[OK]      msmtp config: $MSMTP_CONFIG"
+    # Postfix / sendmail
+    if [ -x /usr/sbin/sendmail ] && systemctl is-active --quiet postfix; then
+        echo "[OK]      Postfix: active"
+        echo "[OK]      sendmail: /usr/sbin/sendmail"
     else
-        echo "[ERROR]   msmtp или его конфигурация недоступны"
+        echo "[ERROR]   Postfix или sendmail недоступны"
         warnings=$((warnings + 1))
     fi
 
@@ -1182,7 +1148,7 @@ ${HOST}
 Версия:
 ${VERSION}
 
-Если письмо получено, уведомления backup.sh через msmtp работают.
+Если письмо получено, уведомления backup.sh через Postfix работают.
 
 Время:
 $(date '+%Y-%m-%d %H:%M:%S %z')"
@@ -1257,3 +1223,4 @@ case "$MODE" in
 esac
 
 exit 0
+
