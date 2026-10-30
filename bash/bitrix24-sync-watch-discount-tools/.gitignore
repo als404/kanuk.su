@@ -1,14 +1,6 @@
-# Local configuration / secrets
-bitrix24_sync_watch.conf
-.msmtprc
-*.secret
-*.env
-
-# Runtime files
-*.log
+# Never commit runtime secrets or state
 *.state
-
-# OS / editor
-.DS_Store
-*.swp
-*.swo
+*.log
+.env
+bitrix24_sync_watch.conf
+!examples/bitrix24_sync_watch.conf.example

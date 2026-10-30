@@ -1,21 +1,23 @@
-# /etc/bitrix24_sync_watch.conf
-# SMTP password is NOT stored here. It remains in MSMTP_CONFIG.
-
+# /etc/bitrix24_sync_watch.conf - root:root 0600
+# Site-specific settings, no passwords or API tokens.
 SITE_NAME="discount-tools.ru"
 
-ACCESS_LOG="/var/log/nginx/discount-tools.ru_access.log"
-B24_USER="bx_eshop"
+# IMPORTANT: confirm the actual log path on production with nginx -T.
+ACCESS_LOG="/var/log/nginx/access.log"
 EXCHANGE_PATH="/bitrix/admin/1c_exchange.php"
-
+B24_USER="bx_eshop"
+# 1: only count HTTP 200 requests with ' - bx_eshop ' in nginx combined log.
+# Set 0 ONLY if Bitrix24 requests do not log the username; this is less reliable.
+REQUIRE_LOG_USER=1
 SYNC_PERIOD_MIN=10
 ALERT_AFTER=1500
+MAX_ROTATED=2
 
-STATE_FILE="/var/tmp/bitrix24_sync_watch.state"
+STATE_FILE="/var/lib/bitrix24-sync-watch/state"
 MONITOR_LOG="/var/log/bitrix24_sync_watch.log"
+LOCK_FILE="/run/lock/bitrix24_sync_watch.lock"
 
-MSMTP="/usr/bin/msmtp"
-MSMTP_CONFIG="/home/bitrix/.msmtprc"
-MSMTP_ACCOUNT="discount-tools.ru"
-
+MAIL_ENABLED=1
+SENDMAIL="/usr/sbin/sendmail"
 EMAIL_FROM="info@discount-tools.ru"
 EMAIL_TO="adm+site@kanuk.su"

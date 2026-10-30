@@ -1,55 +1,61 @@
 #!/usr/bin/env bash
-#
-# bitrix24_sync_watch.sh
-# Monitoring Bitrix24 <-> discount-tools.ru synchronization by successful
-# checkauth requests in the nginx access log.
-#
-# The script does NOT change Bitrix24 settings and does NOT restart services.
-# It only reads nginx logs, keeps a small state file and sends notifications.
-#
-
-set -u
+# Bitrix24 <-> discount-tools.ru sync watch: nginx checkauth activity + Postfix notifications.
+# Does not change Bitrix24 settings or initiate an exchange.
+set -uo pipefail
 umask 077
 
-VERSION="1.0.0"
-
+VERSION="1.1-postfix"
 CONFIG_FILE="${CONFIG_FILE:-/etc/bitrix24_sync_watch.conf}"
 
+# Defaults: override in the external configuration file.
 SITE_NAME="discount-tools.ru"
-
-ACCESS_LOG="/var/log/nginx/discount-tools.ru_access.log"
+ACCESS_LOG="/var/log/nginx/access.log"
 B24_USER="bx_eshop"
+REQUIRE_LOG_USER=1
 EXCHANGE_PATH="/bitrix/admin/1c_exchange.php"
-
 SYNC_PERIOD_MIN=10
 ALERT_AFTER=1500
-
-STATE_FILE="/var/tmp/bitrix24_sync_watch.state"
+STATE_FILE="/var/lib/bitrix24-sync-watch/state"
 MONITOR_LOG="/var/log/bitrix24_sync_watch.log"
-
-MSMTP="/usr/bin/msmtp"
-MSMTP_CONFIG="/home/bitrix/.msmtprc"
-MSMTP_ACCOUNT="discount-tools.ru"
-
+LOCK_FILE="/run/lock/bitrix24_sync_watch.lock"
+SENDMAIL="/usr/sbin/sendmail"
+MAIL_ENABLED=1
 EMAIL_FROM="info@discount-tools.ru"
 EMAIL_TO="adm+site@kanuk.su"
+MAX_ROTATED=2
 
-if [ -r "$CONFIG_FILE" ]; then
+usage() {
+    cat <<'HELP'
+Usage: bitrix24_sync_watch.sh [--run|--check|--dry-run|--test-email|--help]
+  --check       Read-only preflight: show log matching and freshness; no emails/state changes.
+  --dry-run     Read-only evaluation: show decision; no emails/state changes.
+  --test-email  Send one test message through Postfix/sendmail; no state changes.
+  --run         Normal monitoring; send messages only on state changes (default).
+HELP
+}
+
+case "${1:---run}" in
+    --run|--check|--dry-run|--test-email) MODE="${1:---run}" ;;
+    --help|-h) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { usage >&2; exit 2; }
+
+if [ -e "$CONFIG_FILE" ]; then
+    [ -r "$CONFIG_FILE" ] || { printf 'ERROR: config unreadable: %s\n' "$CONFIG_FILE" >&2; exit 2; }
+    # Trusted root-managed shell config. Never store site or FTP passwords in it.
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
 
 HOST_NAME="$(hostname -f 2>/dev/null || hostname)"
 
-log_event() {
-    local event="$1"
-    shift
-    mkdir -p "$(dirname "$MONITOR_LOG")" 2>/dev/null || true
-    printf '%s %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$event" "$*" >> "$MONITOR_LOG"
-}
+error() { printf 'ERROR: %s\n' "$*" >&2; return 2; }
 
-write_state() {
-    printf '%s\n' "$1" > "$STATE_FILE"
+log_event() {
+    local event="$1"; shift
+    mkdir -p -- "$(dirname "$MONITOR_LOG")" || return 1
+    printf '%s %s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$event" "$*" >> "$MONITOR_LOG"
 }
 
 read_state() {
@@ -58,25 +64,27 @@ read_state() {
     fi
 }
 
+write_state() {
+    local dir tmp
+    dir="$(dirname "$STATE_FILE")"
+    mkdir -p -- "$dir" || return 1
+    tmp="$(mktemp "${dir}/.state.XXXXXXXX")" || return 1
+    if ! printf '%s\n' "$1" > "$tmp" || ! mv -f -- "$tmp" "$STATE_FILE"; then
+        rm -f -- "$tmp"
+        return 1
+    fi
+}
+
 send_email() {
-    local subject="$1"
-    local body="$2"
-    local subject_b64
-    local rc
-
-    if [ ! -x "$MSMTP" ]; then
-        log_event "ERROR" "msmtp not found or not executable: $MSMTP"
-        return 1
-    fi
-
-    if [ ! -r "$MSMTP_CONFIG" ]; then
-        log_event "ERROR" "msmtp config is not readable: $MSMTP_CONFIG"
-        return 1
-    fi
-
+    local subject="$1" body="$2" subject_b64 rc
+    [ "$MAIL_ENABLED" = "1" ] || return 0
+    [ -x "$SENDMAIL" ] || { printf 'ERROR: sendmail not executable: %s\n' "$SENDMAIL" >&2; return 1; }
+    # Reject header-injection characters from editable config.
+    [[ "$EMAIL_FROM" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || return 1
+    [[ "$EMAIL_TO" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || return 1
     subject_b64="$(printf '%s' "$subject" | base64 | tr -d '\n')"
 
-    {
+    if {
         printf 'From: %s\n' "$EMAIL_FROM"
         printf 'To: %s\n' "$EMAIL_TO"
         printf 'Subject: =?UTF-8?B?%s?=\n' "$subject_b64"
@@ -84,215 +92,201 @@ send_email() {
         printf 'Content-Type: text/plain; charset=UTF-8\n'
         printf 'Content-Transfer-Encoding: base64\n'
         printf '\n'
-        printf '%s' "$body" | base64
-    } | "$MSMTP" -C "$MSMTP_CONFIG" -a "$MSMTP_ACCOUNT" -t
-
-    rc=$?
-    if [ "$rc" -ne 0 ]; then
-        log_event "ERROR" "msmtp exited with code $rc while sending: $subject"
+        printf '%s\n' "$body" | base64
+    } | "$SENDMAIL" -f "$EMAIL_FROM" -t -i; then
+        return 0
+    else
+        rc=$?
+        printf 'ERROR: sendmail returned %s\n' "$rc" >&2
         return "$rc"
     fi
-
-    return 0
 }
 
-last_success_from_plain() {
+# Read the last matching nginx combined-log entry. A 200 on checkauth proves
+# only an HTTP request, NOT full order/product exchange and NOT response body.
+# Only the quoted request and the following HTTP status are inspected.
+last_matching_line() {
     local file="$1"
-
-    [ -r "$file" ] || return 0
-
-    awk \
-        -v user=" - ${B24_USER} " \
-        -v path="$EXCHANGE_PATH" '
-        index($0, user) &&
-        index($0, path) &&
-        index($0, "type=crm") &&
-        index($0, "mode=checkauth") &&
-        $0 ~ /" 200 / {
+    if [[ "$file" == *.gz ]]; then
+        gzip -cd -- "$file"
+    else
+        cat -- "$file"
+    fi | awk -v u="$B24_USER" -v require_user="$REQUIRE_LOG_USER" -v p="$EXCHANGE_PATH" '
+        {
+            q1=index($0,"\""); if (!q1) next
+            rest=substr($0,q1+1); q2=index(rest,"\""); if (!q2) next
+            request=substr(rest,1,q2-1)
+            after=substr(rest,q2+1)
+            if (after !~ /^ 200([[:space:]]|$)/) next
+            if (index(request,p)==0 || index(request,"type=crm")==0 || index(request,"mode=checkauth")==0) next
+            if (require_user=="1" && index($0," - " u " ")==0) next
             line=$0
         }
-        END {
-            if (line != "") print line
-        }
-    ' "$file"
-}
-
-last_success_from_gzip() {
-    local file="$1"
-
-    [ -r "$file" ] || return 0
-
-    gzip -cd -- "$file" 2>/dev/null | awk \
-        -v user=" - ${B24_USER} " \
-        -v path="$EXCHANGE_PATH" '
-        index($0, user) &&
-        index($0, path) &&
-        index($0, "type=crm") &&
-        index($0, "mode=checkauth") &&
-        $0 ~ /" 200 / {
-            line=$0
-        }
-        END {
-            if (line != "") print line
-        }
+        END { if (line!="") print line }
     '
 }
 
 line_to_epoch() {
-    local line="$1"
-    local raw
-    local normalized
-
-    raw="$(printf '%s\n' "$line" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')"
-    [ -n "$raw" ] || return 1
-
-    normalized="$(printf '%s\n' "$raw" | sed -E \
-        's#^([0-9]{2})/([A-Za-z]{3})/([0-9]{4}):([0-9]{2}:[0-9]{2}:[0-9]{2}) ([+-][0-9]{4})$#\1 \2 \3 \4 \5#')"
-
-    LC_ALL=C date -d "$normalized" '+%s' 2>/dev/null
+    local line="$1" raw normalized
+    if [[ "$line" =~ \[([^][]+)\] ]]; then
+        raw="${BASH_REMATCH[1]}"
+    else
+        return 1
+    fi
+    normalized="$(printf '%s' "$raw" | sed -E 's#^([0-9]{2})/([A-Za-z]{3})/([0-9]{4}):([0-9]{2}:[0-9]{2}:[0-9]{2}) ([+-][0-9]{4})$#\1 \2 \3 \4 \5#')"
+    LC_ALL=C date -d "$normalized" +%s 2>/dev/null
 }
 
-find_last_success() {
-    local current_line=""
-    local archive_line=""
-    local current_epoch=0
-    local archive_epoch=0
-    local latest_archive=""
+get_last_success() {
+    local line candidate epoch best_epoch=0 file newest
+    local log_dir log_base
+    local -a archives=()
+    LAST_EPOCH=0
+    LAST_SOURCE=""
+    [ -r "$ACCESS_LOG" ] || return 2
 
-    current_line="$(last_success_from_plain "$ACCESS_LOG")"
-
-    latest_archive="$(ls -1t "${ACCESS_LOG}"-*.gz 2>/dev/null | head -n 1 || true)"
-    if [ -n "$latest_archive" ]; then
-        archive_line="$(last_success_from_gzip "$latest_archive")"
+    line="$(last_matching_line "$ACCESS_LOG")" || return 2
+    if [ -n "$line" ]; then
+        epoch="$(line_to_epoch "$line")" || return 2
+        best_epoch="$epoch"
+        LAST_SOURCE="$ACCESS_LOG"
     fi
 
-    if [ -n "$current_line" ]; then
-        current_epoch="$(line_to_epoch "$current_line" || printf '0')"
+    # Scan rotated logs only when the current one has no fresh successful request.
+    if [ "$best_epoch" -le $(( $(date +%s) - ALERT_AFTER )) ]; then
+        log_dir="$(dirname "$ACCESS_LOG")"
+        log_base="$(basename "$ACCESS_LOG")"
+        mapfile -t archives < <(
+            find "$log_dir" -maxdepth 1 -type f \
+                \( -name "${log_base}.[0-9]*" -o -name "${log_base}-[0-9]*" \) \
+                -printf '%T@ %p\n' 2>/dev/null \
+                | sort -nr | head -n "$MAX_ROTATED" | cut -d' ' -f2-
+        )
+        for file in "${archives[@]}"; do
+            [ -r "$file" ] || continue
+            candidate="$(last_matching_line "$file")" || continue
+            [ -n "$candidate" ] || continue
+            epoch="$(line_to_epoch "$candidate")" || continue
+            if [ "$epoch" -gt "$best_epoch" ]; then
+                best_epoch="$epoch"
+                LAST_SOURCE="$file"
+            fi
+        done
     fi
-
-    if [ -n "$archive_line" ]; then
-        archive_epoch="$(line_to_epoch "$archive_line" || printf '0')"
-    fi
-
-    if [ "$current_epoch" -ge "$archive_epoch" ] && [ "$current_epoch" -gt 0 ]; then
-        printf '%s\n' "$current_line"
-        return 0
-    fi
-
-    if [ "$archive_epoch" -gt 0 ]; then
-        printf '%s\n' "$archive_line"
-        return 0
-    fi
-
-    return 1
+    LAST_EPOCH="$best_epoch"
 }
 
-alert_body() {
-    local last_text="$1"
-    local age_text="$2"
-
-    cat <<EOF
-На сервере ${HOST_NAME} не обнаружено свежей успешной синхронизации Bitrix24 с сайтом ${SITE_NAME}.
-
-Последний успешный checkauth: ${last_text}
-Без успешной синхронизации: ${age_text}
-
-Штатный период синхронизации: ${SYNC_PERIOD_MIN} минут
-Порог тревоги: $((ALERT_AFTER / 60)) минут
-Пользователь интеграции: ${B24_USER}
-Контролируемый URL: ${EXCHANGE_PATH}?type=crm&mode=checkauth
-Ожидаемый HTTP status: 200
-
-Проверьте интеграцию сайта в Bitrix24. В частности, убедитесь, что период синхронизации не стал равен 0 (ручной режим), а также проверьте доступность сайта, авторизацию и HTTP-ошибки.
-
-Монитор: ${0}
-Лог монитора: ${MONITOR_LOG}
-Nginx access-log: ${ACCESS_LOG}
-EOF
-}
-
-recovered_body() {
-    local last_text="$1"
-    local age_min="$2"
-
-    cat <<EOF
-Синхронизация Bitrix24 с сайтом ${SITE_NAME} восстановлена.
-
-Последний успешный checkauth: ${last_text}
-Возраст последнего успешного запроса: ${age_min} мин.
-
-Пользователь интеграции: ${B24_USER}
-Контролируемый URL: ${EXCHANGE_PATH}?type=crm&mode=checkauth
-HTTP status: 200
-
-Сервер: ${HOST_NAME}
-EOF
-}
-
-for cmd in awk sed date base64 gzip hostname; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        log_event "ERROR" "required command not found: $cmd"
-        printf 'ERROR: required command not found: %s\n' "$cmd" >&2
-        exit 2
-    fi
+for cmd in awk sed date base64 hostname find sort head cut cat mktemp; do
+    command -v "$cmd" >/dev/null 2>&1 || { error "missing command: $cmd"; exit 2; }
 done
 
-previous_state="$(read_state)"
-last_line=""
+[[ "$ALERT_AFTER" =~ ^[1-9][0-9]*$ ]] || { error 'ALERT_AFTER must be a positive integer'; exit 2; }
+[[ "$MAX_ROTATED" =~ ^[0-9]+$ ]] || { error 'MAX_ROTATED must be an integer'; exit 2; }
+[[ "$REQUIRE_LOG_USER" =~ ^[01]$ ]] || { error 'REQUIRE_LOG_USER must be 0 or 1'; exit 2; }
+[[ "$MAIL_ENABLED" =~ ^[01]$ ]] || { error 'MAIL_ENABLED must be 0 or 1'; exit 2; }
+if [ "$MAIL_ENABLED" = "1" ] && [ ! -x "$SENDMAIL" ]; then
+    error "sendmail is missing/not executable: $SENDMAIL"
+    exit 2
+fi
 
-if last_line="$(find_last_success)"; then
-    last_epoch="$(line_to_epoch "$last_line" || true)"
-
-    if [ -z "${last_epoch:-}" ]; then
-        log_event "ERROR" "cannot parse nginx timestamp from matching line"
-        printf 'ERROR: cannot parse timestamp from nginx log\n' >&2
-        exit 3
-    fi
-
-    now_epoch="$(date '+%s')"
-    age_sec=$((now_epoch - last_epoch))
-    [ "$age_sec" -lt 0 ] && age_sec=0
-
-    age_min=$((age_sec / 60))
-    last_text="$(date -d "@${last_epoch}" '+%Y-%m-%d %H:%M:%S %z')"
-
-    if [ "$age_sec" -le "$ALERT_AFTER" ]; then
-        printf 'OK: последний checkauth %s, прошло %s мин.\n' "$last_text" "$age_min"
-
-        if [ "$previous_state" = "ALERT" ]; then
-            log_event "RECOVERED" "last checkauth=${last_text}; age=${age_min}m"
-            send_email \
-                "[OK] Bitrix24: синхронизация восстановлена" \
-                "$(recovered_body "$last_text" "$age_min")" || true
-        elif [ -z "$previous_state" ]; then
-            log_event "STARTED" "monitoring active; last checkauth=${last_text}; age=${age_min}m"
-        fi
-
-        write_state "OK"
+if [ "$MODE" = "--test-email" ]; then
+    [ "$MAIL_ENABLED" = 1 ] || { error 'MAIL_ENABLED=0, test email disabled'; exit 2; }
+    if send_email "[TEST] Bitrix24 sync watch: $SITE_NAME" "Postfix/sendmail test from $HOST_NAME at $(date -Is)."; then
+        printf 'OK: test email submitted to sendmail, recipient=%s\n' "$EMAIL_TO"
         exit 0
     fi
+    exit 2
+fi
 
-    printf 'ALERT: последний checkauth %s, прошло %s мин.\n' "$last_text" "$age_min"
+if [ ! -r "$ACCESS_LOG" ]; then
+    error "nginx access log is missing/unreadable: $ACCESS_LOG (adjust ACCESS_LOG in $CONFIG_FILE)"
+    exit 2
+fi
 
-    if [ "$previous_state" != "ALERT" ]; then
-        log_event "ALERT" "last checkauth=${last_text}; age=${age_min}m"
-        send_email \
-            "[ALERT] Bitrix24: синхронизация остановлена" \
-            "$(alert_body "$last_text" "${age_min} мин.")" || true
+# Lock only actual scheduled runs. Read-only modes do not affect state.
+if [ "$MODE" = "--run" ]; then
+    command -v flock >/dev/null 2>&1 || { error 'flock not found'; exit 2; }
+    exec 9>"$LOCK_FILE" || exit 2
+    if ! flock -n 9; then
+        printf 'INFO: another monitor instance is already running\n'
+        exit 0
     fi
-
-    write_state "ALERT"
-    exit 1
 fi
 
-printf 'ALERT: успешный checkauth Bitrix24 не найден в доступных nginx-логах.\n'
-
-if [ "$previous_state" != "ALERT" ]; then
-    log_event "ALERT" "successful checkauth not found in current or newest rotated nginx log"
-    send_email \
-        "[ALERT] Bitrix24: успешный checkauth не найден" \
-        "$(alert_body "не найден" "неизвестно")" || true
+if ! get_last_success; then
+    error "failed to read/parse nginx log: $ACCESS_LOG"
+    exit 2
 fi
 
-write_state "ALERT"
-exit 1
+NOW="$(date +%s)"
+AGE_SEC=0
+LAST_TEXT="not found"
+STATUS="ALERT"
+if [ "$LAST_EPOCH" -gt 0 ]; then
+    AGE_SEC=$((NOW - LAST_EPOCH))
+    [ "$AGE_SEC" -lt 0 ] && AGE_SEC=0
+    LAST_TEXT="$(date -d "@$LAST_EPOCH" '+%Y-%m-%d %H:%M:%S %z')"
+    [ "$AGE_SEC" -le "$ALERT_AFTER" ] && STATUS="OK"
+fi
+AGE_MIN=$((AGE_SEC / 60))
+PREVIOUS_STATE="$(read_state)"
+
+if [ "$MODE" = "--check" ] || [ "$MODE" = "--dry-run" ]; then
+    printf 'bitrix24_sync_watch.sh %s\n' "$VERSION"
+    printf 'ACCESS_LOG=%s\nB24_USER=%s\nREQUIRE_LOG_USER=%s\n' "$ACCESS_LOG" "$B24_USER" "$REQUIRE_LOG_USER"
+    printf 'SYNC_PERIOD_MIN=%s\nALERT_AFTER=%s\n' "$SYNC_PERIOD_MIN" "$ALERT_AFTER"
+    printf 'MAIL_ENABLED=%s\nSENDMAIL=%s\nEMAIL_TO=%s\n' "$MAIL_ENABLED" "$SENDMAIL" "$EMAIL_TO"
+    printf 'LAST_CHECKAUTH=%s\nLAST_SOURCE=%s\n' "$LAST_TEXT" "${LAST_SOURCE:-not found}"
+    printf 'STATE=%s\nRESULT=%s\n' "${PREVIOUS_STATE:-unset}" "$STATUS"
+    if [ "$LAST_EPOCH" -gt 0 ]; then
+        printf 'AGE_MIN=%s\n' "$AGE_MIN"
+    fi
+    if [ "$MODE" = "--dry-run" ]; then
+        printf 'DRY-RUN: no emails, state changes, or log writes\n'
+        exit 0
+    fi
+    if [ "$STATUS" = "OK" ]; then exit 0; else exit 1; fi
+fi
+
+printf '%s: last checkauth=%s, age=%sm, threshold=%sm\n' "$STATUS" "$LAST_TEXT" \
+    "$([ "$LAST_EPOCH" -gt 0 ] && printf '%s' "$AGE_MIN" || printf '?')" "$((ALERT_AFTER / 60))"
+
+if [ "$STATUS" = "$PREVIOUS_STATE" ]; then
+    exit "$([ "$STATUS" = "OK" ] && printf 0 || printf 1)"
+fi
+
+if [ "$STATUS" = "ALERT" ]; then
+    log_event ALERT "last checkauth=$LAST_TEXT; log=$ACCESS_LOG" || true
+    if ! send_email "[ALERT] Bitrix24: синхронизация не подтверждается — $SITE_NAME" \
+        "Не найден свежий успешный checkauth Битрикс24.
+Сайт: $SITE_NAME
+Сервер: $HOST_NAME
+Последний HTTP 200 checkauth: $LAST_TEXT
+Время с последнего запроса: $([ "$LAST_EPOCH" -gt 0 ] && printf '%s минут' "$AGE_MIN" || printf 'неизвестно')
+Порог: $((ALERT_AFTER / 60)) минут
+Пользователь: $B24_USER
+Журнал: $ACCESS_LOG
+
+Проверьте интеграцию в Битрикс24, период синхронизации, авторизацию и nginx/PHP. Монитор проверяет лишь HTTP 200 checkauth, а не полный импорт."; then
+        log_event ERROR 'failed to send ALERT email; state unchanged for retry' || true
+        exit 2
+    fi
+elif [ "$PREVIOUS_STATE" = "ALERT" ]; then
+    log_event RECOVERED "last checkauth=$LAST_TEXT; age=${AGE_MIN}m" || true
+    if ! send_email "[OK] Bitrix24: синхронизация возобновилась — $SITE_NAME" \
+        "После тревоги появился свежий HTTP 200 checkauth.
+Сайт: $SITE_NAME
+Сервер: $HOST_NAME
+Последний checkauth: $LAST_TEXT
+Возраст: $AGE_MIN минут
+
+Это подтверждает запрос авторизации, но не полный цикл импорта."; then
+        log_event ERROR 'failed to send RECOVERED email; state unchanged for retry' || true
+        exit 2
+    fi
+else
+    log_event STARTED "monitoring active; last checkauth=$LAST_TEXT" || true
+fi
+
+write_state "$STATUS" || { error "cannot write state file: $STATE_FILE"; exit 2; }
+[ "$STATUS" = "OK" ] && exit 0 || exit 1

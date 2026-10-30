@@ -1,277 +1,117 @@
-# MIGRATION - перенос Bitrix24 Sync Watch на другой сервер
+# MIGRATION / INSTALL — Bitrix24 Sync Watch 1.1-postfix
 
-Монитор зависит от инфраструктуры сервера:
+Инструкция для production `discount-tools.ru` (AlmaLinux 9, Postfix). В отличие от исходной версии 1.0.0 отправляет письма через `/usr/sbin/sendmail`, без msmtp.
 
-- nginx access-log и его `log_format`;
-- ротации nginx-логов;
-- `msmtp`;
-- SMTP-конфигурации;
-- root cron;
-- путей к state/log-файлам.
-
-При переносе сайта недостаточно просто скопировать `bitrix24_sync_watch.sh`.
-
-## 1. Зафиксировать старый сервер
+## 1. Скопировать ZIP с Mac
 
 ```bash
-hostname -f
-date
-timedatectl
+scp ~/Downloads/bitrix24-sync-watch-discount-tools-v1.1-postfix.zip als@45.128.206.42:/tmp/
+ssh -t als@45.128.206.42
 ```
+
+## 2. Найти реальный Nginx access-log
 
 ```bash
-ls -lh /var/log/nginx/discount-tools.ru_access.log*
+sudo nginx -T 2>/dev/null | grep -n 'access_log'
+sudo ls -lh /var/log/nginx/*access* /var/log/nginx/access.log* 2>/dev/null | head -30
 ```
+
+Путь по умолчанию в конфиге — `/var/log/nginx/access.log`. Если сайт пишет в другой файл, исправьте `ACCESS_LOG`.
+
+Для диагностики последних запросов (проверьте, нет ли токенов/секретов перед публикацией):
 
 ```bash
-grep ' - bx_eshop ' /var/log/nginx/discount-tools.ru_access.log \
-  | grep '1c_exchange.php' \
-  | grep 'type=crm' \
-  | grep 'mode=checkauth' \
-  | tail -20
+sudo grep -F '1c_exchange.php' /var/log/nginx/access.log | tail -n 10
 ```
+
+## 3. Установить скрипт и конфигурацию
 
 ```bash
-crontab -l
-which msmtp
-ls -la /home/bitrix/.msmtprc
+sudo install -d -m 700 -o root -g root /var/lib/bitrix24-sync-watch
+sudo unzip -p /tmp/bitrix24-sync-watch-discount-tools-v1.1-postfix.zip \
+  bash/bitrix24-sync-watch-discount-tools/bitrix24_sync_watch.sh \
+  | sudo tee /usr/local/sbin/bitrix24_sync_watch.sh >/dev/null
+sudo chown root:root /usr/local/sbin/bitrix24_sync_watch.sh
+sudo chmod 755 /usr/local/sbin/bitrix24_sync_watch.sh
+
+sudo unzip -p /tmp/bitrix24-sync-watch-discount-tools-v1.1-postfix.zip \
+  bash/bitrix24-sync-watch-discount-tools/examples/bitrix24_sync_watch.conf.example \
+  | sudo tee /etc/bitrix24_sync_watch.conf >/dev/null
+sudo chown root:root /etc/bitrix24_sync_watch.conf
+sudo chmod 600 /etc/bitrix24_sync_watch.conf
+sudo vi /etc/bitrix24_sync_watch.conf
 ```
+
+Перед изменениями существующей версии скопируйте старые скрипт и конфиг. В данном переносе скрипта на production ранее не было.
+
+## 4. Проверить вручную (без отправки писем и записи state)
 
 ```bash
-/usr/local/sbin/bitrix24_sync_watch.sh
-cat /var/tmp/bitrix24_sync_watch.state
-tail -30 /var/log/bitrix24_sync_watch.log
+sudo bash -n /usr/local/sbin/bitrix24_sync_watch.sh && echo 'SYNTAX OK'
+sudo /usr/local/sbin/bitrix24_sync_watch.sh --check
+sudo /usr/local/sbin/bitrix24_sync_watch.sh --dry-run
 ```
 
-SMTP-пароль не копировать в Git.
+`--check` должен показать `RESULT=OK`, дату `LAST_CHECKAUTH` и актуальный `LAST_SOURCE`. Если `RESULT=ALERT`, проверьте в первую очередь `ACCESS_LOG`, `B24_USER`, `REQUIRE_LOG_USER` и реальный журнал обращения.
 
-## 2. Что переносить
+ВНИМАНИЕ: если Nginx не записывает username в access-log, `REQUIRE_LOG_USER=1` не найдёт совпадений. Параметр `REQUIRE_LOG_USER=0` разрешает засчитывать любые HTTP 200 `checkauth` по этому URL, что повышает риск ложных OK. Используйте только после изучения формата логов.
 
-Из репозитория:
-
-```text
-bitrix24_sync_watch.sh
-examples/bitrix24_sync_watch.conf.example
-examples/root.cron.example
-logrotate/bitrix24_sync_watch
-```
-
-Отдельно, защищённым способом:
-
-```text
-/home/bitrix/.msmtprc
-```
-
-State-файл переносить не обязательно.
-
-## 3. Найти access-log на новом сервере
+## 5. Проверить отправку Postfix
 
 ```bash
-grep -RniE 'access_log.*discount-tools|server_name.*discount-tools' \
-  /etc/nginx /usr/local/nginx/conf 2>/dev/null
+systemctl is-active postfix
+sudo /usr/local/sbin/bitrix24_sync_watch.sh --test-email
 ```
 
-После ручной синхронизации должна находиться строка:
+Проверьте получение письма на `adm+site@kanuk.su`.
+
+## 6. Первый штатный запуск и cron
+
+При `RESULT=OK`:
 
 ```bash
-grep ' - bx_eshop ' /ПУТЬ/К/access.log \
-  | grep '1c_exchange.php' \
-  | grep 'type=crm' \
-  | grep 'mode=checkauth' \
-  | tail
+sudo /usr/local/sbin/bitrix24_sync_watch.sh --run
+sudo cat /var/lib/bitrix24-sync-watch/state
 ```
 
-Важно: nginx должен писать пользователя `bx_eshop` в access-log. Если этого поля нет, нужно вернуть совместимый `log_format` либо осознанно изменить критерий мониторинга.
-
-## 4. Проверить ротацию nginx
-
-Текущий код ожидает:
-
-```text
-/var/log/nginx/discount-tools.ru_access.log
-/var/log/nginx/discount-tools.ru_access.log-YYYYMMDD.gz
-```
-
-Проверить:
+Только затем включите cron:
 
 ```bash
-ls -lh /var/log/nginx/discount-tools.ru_access.log*
+sudo unzip -p /tmp/bitrix24-sync-watch-discount-tools-v1.1-postfix.zip \
+  bash/bitrix24-sync-watch-discount-tools/examples/root.cron.example \
+  | sudo tee /etc/cron.d/discount-tools-bitrix24-sync-watch >/dev/null
+sudo chown root:root /etc/cron.d/discount-tools-bitrix24-sync-watch
+sudo chmod 644 /etc/cron.d/discount-tools-bitrix24-sync-watch
+systemctl is-active crond
+sudo cat /etc/cron.d/discount-tools-bitrix24-sync-watch
 ```
 
-Если новый сервер использует `access.log.1`, `access.log.2.gz` или другую схему, изменить поиск архивированного файла до включения cron.
-
-## 5. Проверить зависимости
+## 7. Logrotate (дополнительно)
 
 ```bash
-command -v bash
-command -v awk
-command -v sed
-command -v date
-command -v base64
-command -v gzip
-command -v msmtp
+sudo unzip -p /tmp/bitrix24-sync-watch-discount-tools-v1.1-postfix.zip \
+  bash/bitrix24-sync-watch-discount-tools/logrotate/bitrix24_sync_watch \
+  | sudo tee /etc/logrotate.d/bitrix24_sync_watch >/dev/null
+sudo chown root:root /etc/logrotate.d/bitrix24_sync_watch
+sudo chmod 644 /etc/logrotate.d/bitrix24_sync_watch
 ```
 
-## 6. Установить скрипт
+## 8. Диагностика
 
 ```bash
-cp bitrix24_sync_watch.sh /usr/local/sbin/bitrix24_sync_watch.sh
-chmod 755 /usr/local/sbin/bitrix24_sync_watch.sh
-bash -n /usr/local/sbin/bitrix24_sync_watch.sh
+sudo /usr/local/sbin/bitrix24_sync_watch.sh --check
+sudo tail -n 30 /var/log/bitrix24_sync_watch.log
+sudo tail -n 30 /var/log/bitrix24_sync_watch-cron.log
 ```
 
-## 7. Настроить конфиг
+Весь мониторинг основан на HTTP 200 `checkauth`, а не на ответе `success` и не на успешном завершении загрузки заказов. Системные часы сервера должны быть синхронизированы (NTP), а в nginx логах должна присутствовать дата с часовым поясом.
+
+## Откат
 
 ```bash
-cp examples/bitrix24_sync_watch.conf.example /etc/bitrix24_sync_watch.conf
-chmod 600 /etc/bitrix24_sync_watch.conf
-vi /etc/bitrix24_sync_watch.conf
+sudo rm -f /etc/cron.d/discount-tools-bitrix24-sync-watch
+sudo rm -f /usr/local/sbin/bitrix24_sync_watch.sh
+sudo rm -f /etc/bitrix24_sync_watch.conf
 ```
 
-Перепроверить:
-
-```text
-SITE_NAME
-ACCESS_LOG
-B24_USER
-EXCHANGE_PATH
-SYNC_PERIOD_MIN
-ALERT_AFTER
-STATE_FILE
-MONITOR_LOG
-MSMTP
-MSMTP_CONFIG
-MSMTP_ACCOUNT
-EMAIL_FROM
-EMAIL_TO
-```
-
-Если период Bitrix24 изменился с 10 минут, пересчитать `ALERT_AFTER`.
-
-## 8. Восстановить SMTP
-
-Текущая схема:
-
-```text
-msmtp: /usr/bin/msmtp
-config: /home/bitrix/.msmtprc
-account: discount-tools.ru
-from: info@discount-tools.ru
-to: adm+site@kanuk.su
-```
-
-Права:
-
-```bash
-chmod 600 /home/bitrix/.msmtprc
-```
-
-Проверить аккаунт без вывода пароля:
-
-```bash
-grep -nE '^account[[:space:]]+discount-tools\.ru|^account[[:space:]]+default' \
-  /home/bitrix/.msmtprc
-```
-
-## 9. Проверить вручную до cron
-
-Сначала убедиться, что nginx уже содержит свежий успешный `checkauth`.
-
-```bash
-/usr/local/sbin/bitrix24_sync_watch.sh
-```
-
-Ожидается:
-
-```text
-OK: последний checkauth ... прошло N мин.
-```
-
-```bash
-cat /var/tmp/bitrix24_sync_watch.state
-tail -30 /var/log/bitrix24_sync_watch.log
-```
-
-На первом успешном запуске журнал должен получить `STARTED`.
-
-## 10. Включить cron
-
-Только после успешной ручной проверки:
-
-```bash
-crontab -e
-```
-
-```cron
-*/5 * * * * /usr/local/sbin/bitrix24_sync_watch.sh >/dev/null 2>&1
-```
-
-## 11. Настроить logrotate
-
-```bash
-cp logrotate/bitrix24_sync_watch /etc/logrotate.d/bitrix24_sync_watch
-chmod 644 /etc/logrotate.d/bitrix24_sync_watch
-logrotate -d /etc/logrotate.d/bitrix24_sync_watch
-```
-
-## 12. Проверить часовой пояс
-
-```bash
-timedatectl
-date
-```
-
-Парсинг nginx timestamp учитывает смещение из access-log, но NTP и системное время должны быть корректны.
-
-## 13. Переключение со старого сервера
-
-```text
-1. Подготовить новый сервер.
-2. Проверить nginx access-log.
-3. Запустить ручной checkauth Bitrix24.
-4. Запустить монитор вручную - должен быть OK.
-5. Включить cron на новом сервере.
-6. Отключить cron монитора на старом сервере.
-7. Убедиться, что работает один production-монитор.
-```
-
-На старом сервере удалить/закомментировать:
-
-```cron
-*/5 * * * * /usr/local/sbin/bitrix24_sync_watch.sh >/dev/null 2>&1
-```
-
-## 14. Откат
-
-Если после миграции появляются ложные ALERT:
-
-1. временно отключить cron монитора;
-2. проверить `ACCESS_LOG`;
-3. проверить nginx `log_format`;
-4. проверить наличие `bx_eshop`;
-5. проверить схему `.gz` ротации;
-6. проверить `MSMTP_CONFIG` и `MSMTP_ACCOUNT`;
-7. проверить время сервера.
-
-Не менять настройки Bitrix24 только ради исправления ошибки самого монитора.
-
-## 15. Финальный чек-лист
-
-- [ ] скрипт установлен в `/usr/local/sbin/bitrix24_sync_watch.sh`
-- [ ] `bash -n` проходит
-- [ ] `/etc/bitrix24_sync_watch.conf` создан, права `600`
-- [ ] `ACCESS_LOG` правильный
-- [ ] в access-log есть `bx_eshop`
-- [ ] есть `type=crm`
-- [ ] есть `mode=checkauth`
-- [ ] успешный запрос имеет HTTP `200`
-- [ ] схема ротации nginx совместима
-- [ ] `msmtp` установлен
-- [ ] `.msmtprc` перенесён безопасно
-- [ ] аккаунт `discount-tools.ru` существует
-- [ ] SMTP-пароль отсутствует в Git
-- [ ] ручной запуск возвращает `OK`
-- [ ] state содержит `OK`
-- [ ] root cron включён
-- [ ] logrotate проверен
-- [ ] старый cron отключён
+Данные сайта, Битрикс24 и журнал Nginx эти команды не трогают. State и журнал мониторинга сохраняются для диагностики.

@@ -1,2 +1,5 @@
-# Root crontab
-*/5 * * * * /usr/local/sbin/bitrix24_sync_watch.sh >/dev/null 2>&1
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+
+# /etc/cron.d/discount-tools-bitrix24-sync-watch; check every 5 minutes.
+*/5 * * * * root /usr/local/sbin/bitrix24_sync_watch.sh >> /var/log/bitrix24_sync_watch-cron.log 2>&1

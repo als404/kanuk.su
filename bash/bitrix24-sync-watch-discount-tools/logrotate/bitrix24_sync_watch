@@ -1,10 +1,8 @@
-/var/log/bitrix24_sync_watch.log
-{
-    monthly
-    rotate 12
-    compress
-    delaycompress
+/var/log/bitrix24_sync_watch.log /var/log/bitrix24_sync_watch-cron.log {
+    weekly
+    rotate 8
     missingok
     notifempty
-    copytruncate
+    compress
+    create 0600 root root
 }
