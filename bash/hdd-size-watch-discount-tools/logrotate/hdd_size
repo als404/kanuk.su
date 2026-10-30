@@ -1,5 +1,4 @@
-/home/script/logs/hdd_size.log
-{
+/home/script/logs/hdd_size-cron.log {
     weekly
     rotate 8
     compress

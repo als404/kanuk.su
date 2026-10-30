@@ -1,23 +1,11 @@
-# /etc/hdd_size.conf
-#
-# Скопировать:
-#   cp examples/hdd_size.conf.example /etc/hdd_size.conf
-#   chmod 600 /etc/hdd_size.conf
-#
-# Секреты SMTP здесь не хранятся. Пароль остаётся в MSMTP_CONFIG.
-
+# /etc/hdd_size.conf — настройки production discount-tools.ru
 DISK_TARGET="/dev/vda1"
 THRESHOLD=90
-
-CACHE_DIR="/home/bitrix/ext_www/public_html/bitrix/cache"
-
+CACHE_DIR="/var/www/discount-tools/public/bitrix/cache"
 STATE_FILE="/var/tmp/hdd_size.state"
 LOCK_FILE="/var/lock/hdd_size.lock"
-
 MAIL_ENABLED=1
-MSMTP="/usr/bin/msmtp"
-MSMTP_CONFIG="/home/bitrix/.msmtprc"
-MSMTP_ACCOUNT="discount-tools.ru"
-
+SENDMAIL="/usr/sbin/sendmail"
 EMAIL_FROM="info@discount-tools.ru"
 EMAIL_TO="adm+site@kanuk.su"
+HOST_LABEL="discount-tools.ru"
