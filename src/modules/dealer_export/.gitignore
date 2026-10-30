@@ -1,5 +1,13 @@
+# Локальные рабочие конфиги и результаты выгрузки
+dealer_export.json
+*.xml
 *.preview.xml
 *.tmp
 *.log
+*.lock
+*.status
+*.request
+*.processing
 __pycache__/
 *.pyc
+.DS_Store

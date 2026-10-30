@@ -1,349 +1,93 @@
-# Dealer Export — XML-выгрузка BREXIT / ESSON
+# Dealer Export — BREXIT / ESSON (полный Git-пакет)
 
-Модуль формирует отдельные XML-файлы товаров брендов **BREXIT** и **ESSON** для дилеров.
+**Проект:** discount-tools.ru · **Версия пакета:** 1.3-production-verified · **Инфоблок товаров:** 16.
 
-Экспорт выполняется напрямую из MySQL без загрузки полного ядра 1С-Битрикс. Это уменьшает нагрузку на сайт при регулярном запуске.
+Пакет объединяет **Python-генератор дилерского XML** из исходного архива `dealer_export.zip` и **административную страницу Битрикс** из `dealer-xml-admin-v1.1.zip`. Меню «Магазин → Продукция → XML для дилеров» уже настроено на production.
 
-## Структура в Git
+> **Проверено 30.10.2026:** `bin/dealer_export.py` заменён точной копией действующего production-файла, полученного с `/var/www/discount-tools/public/local/tools/dealer-export/dealer_export.py`. С исходной Git-версией отличается только одной конечной пустой строкой. Подробности в [SOURCE_VERIFICATION.md](SOURCE_VERIFICATION.md). Весь Python-код генератора сохранён без функциональных изменений.
 
-Модуль хранится в репозитории по пути:
+## Дерево Git
 
 ```text
-src/
-└── modules/
-    └── dealer_export/
-        ├── dealer_export.py
-        ├── dealer_export.json
-        ├── check_dealer_export_data.py
-        ├── index.php
-        ├── README.md
-        ├── MIGRATION.md
-        └── .gitignore
+kanuk.su/
+└── src/
+    └── modules/
+        └── dealer_export/
+            ├── bin/
+            │   ├── dealer_export.py                 # генератор BREXIT / ESSON
+            │   ├── check_dealer_export_data.py      # диагностика структуры БД
+            │   └── dealer_xml_manual_worker.sh      # обработчик запросов из админки
+            ├── admin/
+            │   ├── discount_dealer_xml.php          # интерфейс администрирования
+            │   ├── discount_dealer_xml_router.php   # входной роутер /bitrix/admin/
+            │   └── dealer_xml_admin_menu.php        # вставка в штатную «Продукцию»
+            ├── cron/
+            │   └── discount-tools-dealer-xml-manual # cron ручной очереди
+            ├── examples/
+            │   └── dealer_export.json.example       # настройки без паролей
+            ├── legacy/
+            │   └── index.php                       # историческая страница, НЕ устанавливать
+            ├── .gitignore
+            ├── README.md
+            ├── MIGRATION.md
+            └── SOURCE_VERIFICATION.md
 ```
 
-Назначение файлов:
+## Расположение на production
 
-| Файл | Назначение |
+| Файл в Git | Путь на сервере |
 |---|---|
-| `dealer_export.py` | основной Python-экспортёр |
-| `dealer_export.json` | конфигурация конкретного сайта/сервера |
-| `check_dealer_export_data.py` | диагностический скрипт для проверки структуры каталога |
-| `index.php` | закрытая страница Битрикс для ручного запуска |
-| `README.md` | установка и эксплуатация |
-| `MIGRATION.md` | перенос на другой хостинг/домен |
+| `bin/dealer_export.py` | `/var/www/discount-tools/public/local/tools/dealer-export/dealer_export.py` |
+| `bin/check_dealer_export_data.py` | `/var/www/discount-tools/public/local/tools/dealer-export/check_dealer_export_data.py` (только для диагностики) |
+| `examples/dealer_export.json.example` | `/var/www/discount-tools/public/local/tools/dealer-export/dealer_export.json` (**после настройки**, не перезаписывать существующий) |
+| `bin/dealer_xml_manual_worker.sh` | `/var/www/discount-tools/public/local/tools/dealer-export/dealer_xml_manual_worker.sh` |
+| `admin/discount_dealer_xml.php` | `/var/www/discount-tools/public/local/admin/discount_dealer_xml.php` |
+| `admin/discount_dealer_xml_router.php` | `/var/www/discount-tools/public/bitrix/admin/discount_dealer_xml.php` |
+| `admin/dealer_xml_admin_menu.php` | `/var/www/discount-tools/public/local/php_interface/dealer_xml_admin_menu.php` |
+| `cron/discount-tools-dealer-xml-manual` | `/etc/cron.d/discount-tools-dealer-xml-manual` |
 
-## Что формируется
+Рабочие XML-файлы создаются в `/var/www/discount-tools/public/dealer-export/`, публичные ссылки:
 
-Публичные файлы:
+- `https://discount-tools.ru/dealer-export/brexit.xml`
+- `https://discount-tools.ru/dealer-export/esson.xml`
 
-```text
-/dealer-export/brexit.xml
-/dealer-export/esson.xml
-```
+## Как работает
 
-В XML передаются артикул, название, бренд, категории, описание, цена, валюта, наличие, количество, единица измерения, изображения, характеристики и URL товара.
+1. Основной `dealer_export.py` читает параметры БД из файлов конфигурации Битрикс, без хранения паролей в JSON. Генерирует два XML для производителей BREXIT (ID 267) и ESSON (ID 3688).
+2. Существующее **почасовое задание** `/usr/local/bin/discount-tools-sync-and-export.sh` сначала обновляет цены/остатки, затем вызывает генератор. **Скрипт почасовой обвязки в этот пакет не входит**, так как его рабочая версия на сервере не была предоставлена. Сохранять отдельно в Git после выгрузки с production.
+3. PHP-страница доступна администраторам Битрикс, показывает URL, размер, дату файлов, и ставит запрос на ручную генерацию в очередь.
+4. Ручную очередь обрабатывает `dealer_xml_manual_worker.sh` под пользователем `discount` каждую минуту. Очередь/статус/лог хранятся вне DOCUMENT_ROOT: `/var/lib/discount-tools/dealer-xml`.
+5. Обработчик меню `OnBuildGlobalMenu` вставляет пункт в существующую «Продукцию» после «Характеристик категорий» по `items_id`, **без создания дубля**.
 
-Товары без артикула в выгрузку не попадают.
+## Привязка меню Битрикс
 
-## Текущая структура каталога
-
-| Параметр | Значение |
-|---|---:|
-| Основной инфоблок | `16` |
-| Инфоблок SKU | `17` |
-| `ARTNUMBER` | ID `51` |
-| `MANUFACTURER` | ID `52` |
-| `MORE_PHOTO` | ID `50` |
-| BREXIT | manufacturer ID `267` |
-| ESSON | manufacturer ID `3688` |
-| Цена BASE | ID `1` |
-| Валюта | `RUB` |
-
-Если структура каталога меняется, эти значения необходимо перепроверить.
-
-# Установка с нуля на сайт
-
-Ниже приведена рабочая раскладка файлов на сервере. Путь `/var/www/kanuk/data/www/kanuk.brexit.by` используется как пример текущего тестового сайта. На другом сервере его нужно заменить на фактический `DOCUMENT_ROOT`.
-
-## 1. Создать каталоги
-
-На сервере должны существовать:
-
-```text
-SITE_ROOT/
-├── dealer-export/                 # публичные XML
-└── local/
-    ├── modules/
-    │   └── dealer_export/         # PHP-страница ручного запуска
-    ├── tools/
-    │   └── dealer-export/         # Python и конфиг
-    └── var/
-        └── log/                   # журналы
-```
-
-Пример команд:
-
-```bash
-SITE=/var/www/kanuk/data/www/kanuk.brexit.by
-
-mkdir -p "$SITE/local/tools/dealer-export"
-mkdir -p "$SITE/local/modules/dealer_export"
-mkdir -p "$SITE/local/var/log"
-mkdir -p "$SITE/dealer-export"
-```
-
-## 2. Разложить файлы из Git по рабочим каталогам
-
-Файлы **не копируются на сайт в той же структуре, что и в Git**. Они раскладываются так:
-
-```text
-Git:
-src/modules/dealer_export/dealer_export.py
-    ↓
-Сайт:
-local/tools/dealer-export/dealer_export.py
-
-Git:
-src/modules/dealer_export/dealer_export.json
-    ↓
-Сайт:
-local/tools/dealer-export/dealer_export.json
-
-Git:
-src/modules/dealer_export/index.php
-    ↓
-Сайт:
-local/modules/dealer_export/index.php
-```
-
-Диагностический файл `check_dealer_export_data.py` можно хранить только в Git или временно размещать рядом с `dealer_export.py` при диагностике.
-
-`README.md`, `MIGRATION.md` и `.gitignore` на production-сайт копировать не требуется.
-
-Пример ручного копирования:
-
-```bash
-SITE=/var/www/kanuk/data/www/kanuk.brexit.by
-REPO=/path/to/repository
-
-cp "$REPO/src/modules/dealer_export/dealer_export.py" \
-   "$SITE/local/tools/dealer-export/dealer_export.py"
-
-cp "$REPO/src/modules/dealer_export/dealer_export.json" \
-   "$SITE/local/tools/dealer-export/dealer_export.json"
-
-cp "$REPO/src/modules/dealer_export/index.php" \
-   "$SITE/local/modules/dealer_export/index.php"
-```
-
-## 3. Настроить `dealer_export.json`
-
-Для конкретного сервера проверить минимум:
-
-```json
-{
-  "site_root": "/actual/site/root",
-  "expected_database": "database_name",
-  "base_url": "https://example.ru",
-  "output_dir": "/actual/site/root/dealer-export",
-  "log_file": "/actual/site/root/local/var/log/dealer_export.log",
-  "lock_file": "/tmp/dealer-export.lock"
-}
-```
-
-В конфиге из репозитория сохранены параметры текущего тестового окружения. Перед использованием на другом сервере их обязательно изменить.
-
-Пароли БД в конфиг не добавляются. Экспортёр получает параметры подключения из конфигурации Битрикс на сервере.
-
-## 4. Проверить пути в `index.php`
-
-В начале `index.php` заданы фиксированные серверные пути:
+В действующем `/var/www/discount-tools/public/bitrix/php_interface/init.php` должна находиться одна строка внутри PHP-кода:
 
 ```php
-$python    = "/usr/bin/python3";
-$script    = "/actual/site/root/local/tools/dealer-export/dealer_export.py";
-$config    = "/actual/site/root/local/tools/dealer-export/dealer_export.json";
-$outputDir = "/actual/site/root/dealer-export";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/local/php_interface/dealer_xml_admin_menu.php';
 ```
 
-При установке на другой сервер их необходимо заменить.
+**Не перезаписывайте** `init.php` из Git: там уже есть другие рабочие обработчики (включая меню характеристик категорий).
 
-Страница специально не принимает произвольные команды или пути из HTTP-запроса.
+## Первоначальная настройка и проверка
 
-## 5. Настроить права
+Подробная последовательность создания каталога, переноса файлов, настройки параметров, синтаксических проверок, cron, Nginx и отката дана в [MIGRATION.md](MIGRATION.md).
 
-Определить пользователя PHP-FPM:
+Для проверки самого генератора, **без публикации**, после настройки JSON на сервере:
 
 ```bash
-ps -eo user,group,cmd | grep '[p]hp-fpm'
-```
-
-Рекомендуемая схема:
-
-```text
-dealer_export.py      750
-dealer_export.json    640
-index.php             644
-dealer-export/        755
-```
-
-Cron желательно запускать от того же пользователя сайта, который имеет права создавать XML и писать журнал.
-
-Не использовать `chmod 777` и не запускать `sudo` из PHP.
-
-## 6. Проверить Python и системные команды
-
-```bash
-python3 --version
-which python3
-which php
-which mysql || which mariadb
-```
-
-Экспортёр использует стандартную библиотеку Python. Дополнительные Python-пакеты не требуются.
-
-Для чтения параметров Битрикс и выполнения SQL необходимы доступные CLI-команды PHP и MySQL/MariaDB.
-
-## 7. Первый проверочный запуск
-
-Сначала запуск без публикации:
-
-```bash
-/usr/bin/python3 \
-  /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.py \
-  --config /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.json \
+sudo -u discount /usr/bin/python3 \
+  /var/www/discount-tools/public/local/tools/dealer-export/dealer_export.py \
+  --config /var/www/discount-tools/public/local/tools/dealer-export/dealer_export.json \
   --no-publish
 ```
 
-Проверить лог:
+Не запускайте повторно почасовую синхронизацию цен/остатков ради проверки интерфейса. Для теста ручной очереди используйте кнопку в админке только после установки cron.
 
-```bash
-tail -50 /var/www/kanuk/data/www/kanuk.brexit.by/local/var/log/dealer_export.log
-```
+## Безопасность и Git
 
-После успешной проверки выполнить публикацию:
-
-```bash
-/usr/bin/python3 \
-  /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.py \
-  --config /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.json
-```
-
-## 8. Добавить ссылку в закрытый раздел Битрикс
-
-На закрытой странице для сотрудников/администратора добавить переход:
-
-```html
-<a href="/local/modules/dealer_export/">Обновить XML BREXIT / ESSON</a>
-```
-
-Сам `index.php` дополнительно проверяет авторизацию, права администратора и Bitrix session ID.
-
-## 9. Настроить cron
-
-Пример ежедневного запуска:
-
-```cron
-17 3 * * * /usr/bin/python3 /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.py --config /var/www/kanuk/data/www/kanuk.brexit.by/local/tools/dealer-export/dealer_export.json >> /var/www/kanuk/data/www/kanuk.brexit.by/local/var/log/dealer_export_cron.log 2>&1
-```
-
-Перед добавлением cron проверить часовой пояс сервера:
-
-```bash
-date
-timedatectl
-```
-
-В экспортёре уже есть собственный lock, поэтому отдельный `flock` в cron не требуется.
-
-## 10. Финальная проверка установки
-
-Проверить три сценария:
-
-```text
-1. запуск из терминала;
-2. запуск кнопкой из закрытого раздела Битрикс;
-3. запуск cron.
-```
-
-После каждого сценария проверить:
-
-```bash
-tail -30 SITE_ROOT/local/var/log/dealer_export.log
-
-grep -m1 generated_at SITE_ROOT/dealer-export/brexit.xml
-grep -m1 generated_at SITE_ROOT/dealer-export/esson.xml
-```
-
-Публичные URL:
-
-```text
-https://DOMAIN/dealer-export/brexit.xml
-https://DOMAIN/dealer-export/esson.xml
-```
-
-# Безопасная публикация XML
-
-Экспорт выполняется по схеме:
-
-```text
-получение данных
-    ↓
-создание временного XML
-    ↓
-валидация
-    ↓
-проверка обязательных данных
-    ↓
-fsync
-    ↓
-atomic replace
-```
-
-Если генерация завершается ошибкой, предыдущий публичный XML остаётся на месте.
-
-Одновременный запуск нескольких экземпляров блокируется lock-файлом.
-
-# Логи
-
-Основной лог:
-
-```text
-local/var/log/dealer_export.log
-```
-
-Вывод cron:
-
-```text
-local/var/log/dealer_export_cron.log
-```
-
-Успешный запуск заканчивается строкой:
-
-```text
-INFO Dealer export finished successfully
-```
-
-# Время обновления
-
-В атрибуте XML:
-
-```xml
-generated_at="2026-10-22T21:52:52+00:00"
-```
-
-время хранится в UTC.
-
-На административной странице время формирования читается из `generated_at`, а не через `filemtime()`. Это исключает проблему устаревшего времени при использовании NFS/stat-cache.
-
-# Что не хранить в Git
-
-Не следует коммитить:
-
-- пароли и секреты;
-- XML, сформированные на production;
-- production-логи;
-- lock-файлы;
-- временные файлы.
-
-Для переноса на другой хостинг и смены домена см. [MIGRATION.md](./MIGRATION.md).
+- Рабочий `dealer_export.json` с серверными путями в Git не добавлять; хранить только `*.example`.
+- Не добавлять `/bitrix/.settings.php`, `/bitrix/php_interface/dbconn.php`, FTP/SMTP-пароли, дампы БД, XML-файлы и логи.
+- Роутер `/bitrix/admin/discount_dealer_xml.php` — один из немногих новых файлов в дереве `/bitrix`, он не изменяет ядро.
+- Старый `legacy/index.php` использовал непосредственный запуск PHP → shell и жёсткие пути тестового сервера; **не устанавливать** его при новом развёртывании.
+- Файл `bin/dealer_export.py` теперь побайтово совпадает с полученной копией production на 30.10.2026. Если впоследствии он изменится на сервере, снова сверить хеши перед развёртыванием.

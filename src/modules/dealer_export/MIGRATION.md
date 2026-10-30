@@ -1,330 +1,151 @@
-# Миграция Dealer Export на новый хостинг / домен
+# Перенос Dealer Export на другой сервер / домен
 
-Документ используется при переносе сайта вместе с XML-выгрузкой BREXIT / ESSON на другой сервер.
+## 1. Резервные копии и аудит
 
-Предполагается, что сайт переносится уже в рабочей конфигурации **UTF-8 + PHP 7.4**, поэтому отдельная адаптация старой базы Windows-1251 / PHP 5.6 не требуется.
+Перед заменой действующих файлов скопировать (не публиковать в Git):
 
-## 1. Перенести файлы
+- `/var/www/discount-tools/public/local/tools/dealer-export/dealer_export.py`
+- `/var/www/discount-tools/public/local/tools/dealer-export/dealer_export.json`
+- `/etc/cron.d/discount-tools-cost-update`
+- `/usr/local/bin/discount-tools-sync-and-export.sh`
+- `/var/www/discount-tools/public/bitrix/php_interface/init.php`
+- `/etc/nginx/conf.d/discount-tools.conf`
 
-На новый сервер необходимо перенести:
-
-```text
-local/tools/dealer-export/dealer_export.py
-local/tools/dealer-export/dealer_export.json
-local/modules/dealer_export/index.php
-```
-
-Также должны существовать:
-
-```text
-dealer-export/
-local/var/log/
-```
-
-Если в Git файлы хранятся в `src/modules/dealer_export/`, при деплое их необходимо разместить в соответствующих рабочих каталогах сайта.
-
-## 2. Проверить Python
+Версия `bin/dealer_export.py` сверена с production 30.10.2026 (см. `SOURCE_VERIFICATION.md`). **Перед будущим деплоем** повторно сравните хеши, так как серверный код может измениться:
 
 ```bash
-python3 --version
-which python3
+sha256sum /var/www/discount-tools/public/local/tools/dealer-export/dealer_export.py
 ```
 
-Если путь отличается от `/usr/bin/python3`, изменить его в:
-
-- cron;
-- PHP-странице ручного запуска.
-
-## 3. Изменить домен
-
-В production-конфигурации заменить тестовый адрес:
-
-```text
-https://kanuk.brexit.by
-```
-
-на production-домен, например:
-
-```text
-https://discount-tools.ru
-```
-
-После изменения проверить ссылки внутри XML:
-
-```xml
-<url>https://discount-tools.ru/catalog/...</url>
-```
-
-Также проверить абсолютные URL изображений.
-
-## 4. Изменить серверные пути
-
-На новом сервере проверить и изменить:
-
-```text
-site_root
-output_dir
-log_file
-путь к dealer_export.py
-путь к dealer_export.json
-путь в PHP-обработчике
-путь в cron
-```
-
-Пример старого пути:
-
-```text
-/var/www/kanuk/data/www/kanuk.brexit.by/
-```
-
-Его необходимо заменить на фактический `DOCUMENT_ROOT` production-сайта.
-
-## 5. Проверить параметры БД
-
-Проверить:
-
-- имя базы;
-- host;
-- доступ пользователя БД;
-- кодировку соединения;
-- наличие таблиц каталога.
-
-Если экспортёр читает подключение из `.settings.php` Битрикс, убедиться, что файл находится по ожидаемому пути и доступен пользователю запуска.
-
-## 6. Проверить структуру каталога
-
-Если переносится копия текущей базы целиком, ID должны сохраниться.
-
-Контрольные значения:
-
-```text
-Каталог:                  iblock 16
-SKU:                      iblock 17
-ARTNUMBER:                property 51
-MANUFACTURER:             property 52
-MORE_PHOTO:               property 50
-BREXIT manufacturer ID:   267
-ESSON manufacturer ID:    3688
-BASE price group:         1
-```
-
-Если каталог пересоздавался или свойства менялись, значения необходимо проверить.
-
-## 7. Настроить владельца и права
-
-Определить пользователя PHP-FPM:
+На Mac в корне Git:
 
 ```bash
-ps -eo user,group,cmd | grep '[p]hp-fpm'
+shasum -a 256 src/modules/dealer_export/bin/dealer_export.py
 ```
 
-Проверить владельцев:
+Если хеши различаются — скачать актуальный рабочий файл с сервера, проверить diff и обновить Git до изменения production.
 
-```bash
-ls -la /path/to/local/tools/dealer-export
-ls -la /path/to/dealer-export
-ls -la /path/to/local/var/log
-```
+## 2. Системные зависимости
 
-Cron рекомендуется запускать от пользователя сайта.
+- Nginx, PHP, MySQL/MariaDB client, `python3`, `flock`, `timeout`, Bitrix.
+- На текущем сервере: сайт `/var/www/discount-tools/public`, пользователь `discount`, PHP-FPM 7.4.
+- Python-генератор использует стандартную библиотеку Python и внешние CLI `php`, `mysql`/`mariadb`.
+- Для cron проверить `crond` и наличие `python3`, `php`, `mysql` в `PATH` пользователя `discount`.
 
-Не использовать:
+## 3. Дерево развёртывания
 
 ```text
-chmod 777
-sudo из PHP
+SITE_ROOT/
+├── bitrix/admin/discount_dealer_xml.php             # роутер
+├── bitrix/php_interface/init.php                    # существующий, подключить меню
+├── dealer-export/                                  # публичные XML, не PHP
+└── local/
+    ├── admin/discount_dealer_xml.php                # интерфейс
+    ├── php_interface/dealer_xml_admin_menu.php      # меню
+    ├── tools/dealer-export/
+    │   ├── dealer_export.py
+    │   ├── dealer_export.json                         # создать из примера, исключить из Git
+    │   ├── check_dealer_export_data.py               # необязательная диагностика
+    │   └── dealer_xml_manual_worker.sh
+    └── var/log/dealer_export.log                    # создаётся генератором
+
+/etc/cron.d/discount-tools-dealer-xml-manual           # cron ручной очереди
+/var/lib/discount-tools/dealer-xml/                  # очередь, статус, лог
 ```
 
-## 8. Проверить lock-файл
-
-Перед первым запуском:
+## 4. Установка на чистый сервер
 
 ```bash
-pgrep -af dealer_export.py
+SITE=/var/www/discount-tools/public
+REPO=/path/to/kanuk.su/src/modules/dealer_export
+
+sudo install -d -m 755 "$SITE/local/tools/dealer-export" "$SITE/local/admin" "$SITE/local/php_interface" "$SITE/bitrix/admin" "$SITE/dealer-export" "$SITE/local/var/log"
+sudo install -o root -g root -m 755 "$REPO/bin/dealer_export.py" "$SITE/local/tools/dealer-export/dealer_export.py"
+sudo install -o root -g root -m 755 "$REPO/bin/dealer_xml_manual_worker.sh" "$SITE/local/tools/dealer-export/dealer_xml_manual_worker.sh"
+sudo install -o root -g root -m 644 "$REPO/admin/discount_dealer_xml.php" "$SITE/local/admin/discount_dealer_xml.php"
+sudo install -o root -g root -m 644 "$REPO/admin/discount_dealer_xml_router.php" "$SITE/bitrix/admin/discount_dealer_xml.php"
+sudo install -o root -g root -m 644 "$REPO/admin/dealer_xml_admin_menu.php" "$SITE/local/php_interface/dealer_xml_admin_menu.php"
+sudo install -o discount -g discount -m 644 "$REPO/examples/dealer_export.json.example" "$SITE/local/tools/dealer-export/dealer_export.json"
+sudo install -d -o discount -g discount -m 750 /var/lib/discount-tools/dealer-xml
+sudo install -o root -g root -m 644 "$REPO/cron/discount-tools-dealer-xml-manual" /etc/cron.d/discount-tools-dealer-xml-manual
 ```
 
-Если экспортёр не работает, старый lock-файл можно удалить:
+На **работающем production** не выполнять эти команды слепо: они перезапишут конфигурацию экспортёра и его код. Для текущего сервера PHP и меню уже установлены, нужен только контроль версий в Git.
+
+## 5. Настройки при смене хостинга/домена
+
+Создать `dealer_export.json` из `examples/dealer_export.json.example`, проверить:
+
+| Параметр | Что изменить |
+|---|---|
+| `site_root` | Абсолютный путь DOCUMENT_ROOT |
+| `base_url` | Публичный HTTPS-домен |
+| `output_dir` | Папка, куда писать `brexit.xml` и `esson.xml` |
+| `log_file` | Путь к доступному для записи журналу |
+| `lock_file` | Путь к файлу блокировки экспортёра |
+| `expected_database` | Реальное имя базы |
+| `product_iblock_id` | ID инфоблока товаров (сейчас 16) |
+| `manufacturer_property_id` | ID свойства бренда (52) |
+| `article_property_id` | ID артикула (51) |
+| `more_photo_property_id` | ID дополнительных фото (50) |
+| `price_group_id` | Тип цены (1) |
+| `brands.*.manufacturer_id` | Элементы брендов BREXIT 267, ESSON 3688 |
+
+Смену кодировки MySQL/таблиц проверять отдельно (legacy CP1251 vs UTF-8); не выполнять массовую перекодировку без анализа текущей базы. Пароли БД считываются генератором из конфигурации Битрикс.
+
+Пути в `bin/dealer_xml_manual_worker.sh` фиксированы под текущий production — при смене корня сайта исправить `SITE`, `STATE_DIR`, `SCRIPT`, `CONFIG`. В `admin/discount_dealer_xml.php` при необходимости изменить `$stateDir`; в `cron/discount-tools-dealer-xml-manual` изменить путь к worker и пользователя сайта. Ссылки в PHP сейчас содержат домен `discount-tools.ru`: при миграции также заменить его.
+
+## 6. Меню админки
+
+Подключение **в действующий** `/bitrix/php_interface/init.php`:
+
+```php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/local/php_interface/dealer_xml_admin_menu.php';
+```
+
+Не создавать второй `init.php` и не удалять уже существующие обработчики, особенно `dt.catalogproperties`. Обработчик `OnBuildGlobalMenu` не создаёт отдельную группу «Продукция», использует `items_id` уже существующих пунктов.
+
+## 7. Публичный доступ к XML (Nginx)
+
+На production ранее присутствовало правило `location ^~ /dealer-export/ { return 404; }`. Поэтому файлы на диске могли быть видны в админке, но давать 404 по URL. В HTTPS server для магазина нужно разместить **перед общим запретом** точные разрешения:
+
+```nginx
+location = /dealer-export/brexit.xml {
+    default_type application/xml;
+    try_files $uri =404;
+}
+location = /dealer-export/esson.xml {
+    default_type application/xml;
+    try_files $uri =404;
+}
+location ^~ /dealer-export/ { return 404; }
+```
+
+Не открывайте весь `/dealer-export/` и не разрешайте исполняемые скрипты из публичного каталога. Проверка:
 
 ```bash
-rm -f /tmp/kanuk-dealer-export.lock
+sudo nginx -t && sudo systemctl reload nginx
+curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' https://discount-tools.ru/dealer-export/brexit.xml
+curl -sS -o /dev/null -w '%{http_code} %{content_type}\n' https://discount-tools.ru/dealer-export/esson.xml
 ```
 
-Если в production меняется имя lock-файла, новое имя необходимо зафиксировать в конфигурации/коде.
-
-## 9. Первый запуск — без публикации
+## 8. Проверки после миграции
 
 ```bash
-/usr/bin/python3 \
-  /path/to/dealer_export.py \
-  --config /path/to/dealer_export.json \
-  --no-publish
+SITE=/var/www/discount-tools/public
+sudo /opt/remi/php74/root/usr/bin/php -l "$SITE/local/admin/discount_dealer_xml.php"
+sudo /opt/remi/php74/root/usr/bin/php -l "$SITE/local/php_interface/dealer_xml_admin_menu.php"
+sudo /opt/remi/php74/root/usr/bin/php -l "$SITE/bitrix/admin/discount_dealer_xml.php"
+sudo bash -n "$SITE/local/tools/dealer-export/dealer_xml_manual_worker.sh"
+sudo -u discount /usr/bin/python3 "$SITE/local/tools/dealer-export/dealer_export.py" --config "$SITE/local/tools/dealer-export/dealer_export.json" --no-publish
 ```
 
-Проверить лог:
+Проверить существующее почасовое расписание `discount-tools-cost-update`, которое запускает обновление остатков/цен и затем экспортёр. Не запускать cron вручную для теста страницы. Проверить, что новая кнопка ставит запрос в очередь, и что `discount-tools-dealer-xml-manual` обрабатывает его через одну минуту. При отказе проверять `/var/lib/discount-tools/dealer-xml/manual.log` и `manual.status`. Не удалять `manual.processing` до завершения процесса.
 
-```bash
-tail -50 /path/to/local/var/log/dealer_export.log
-```
+## 9. Откат
 
-Контрольные ориентиры текущей базы:
-
-```text
-BREXIT: 1428 товаров
-ESSON:   97 товаров
-```
-
-Количество может измениться, если каталог обновлялся после подготовки документации.
-
-Не должно быть неожиданных:
-
-```text
-ERROR
-Traceback
-validation failed
-```
-
-## 10. Проверить preview XML
-
-Проверить:
-
-- XML корректно открывается;
-- бренд соответствует файлу;
-- товары имеют артикулы;
-- цены корректны;
-- наличие корректно;
-- единицы измерения корректны;
-- изображения открываются;
-- ссылки используют новый домен;
-- описание передаётся корректно;
-- количество товаров соответствует каталогу.
-
-Рекомендуется вручную проверить несколько товаров каждого бренда.
-
-## 11. Выполнить production-публикацию
-
-После успешного `--no-publish`:
-
-```bash
-/usr/bin/python3 \
-  /path/to/dealer_export.py \
-  --config /path/to/dealer_export.json
-```
-
-Проверить:
-
-```bash
-grep -m1 generated_at /path/to/dealer-export/brexit.xml
-grep -m1 generated_at /path/to/dealer-export/esson.xml
-ls -lh /path/to/dealer-export/
-```
-
-## 12. Проверить публичные URL
-
-После переключения домена должны открываться:
-
-```text
-https://NEW-DOMAIN/dealer-export/brexit.xml
-https://NEW-DOMAIN/dealer-export/esson.xml
-```
-
-Сообщение браузера:
-
-```text
-This XML file does not appear to have any style information associated with it.
-```
-
-не является ошибкой.
-
-## 13. Проверить страницу ручного запуска
-
-В PHP-обработчике изменить фиксированные пути:
-
-```text
-python
-dealer_export.py
-dealer_export.json
-output directory
-```
-
-Проверить:
-
-- доступ только администратору;
-- POST-запуск;
-- `check_bitrix_sessid()`;
-- доступность `exec()`;
-- возможность записи XML;
-- возможность записи логов.
-
-После нажатия кнопки в журнале должен появиться новый блок:
-
-```text
-INFO Dealer export start; publish=yes
-...
-INFO Dealer export finished successfully
-```
-
-Время на странице рекомендуется читать из `generated_at` XML.
-
-## 14. Настроить cron
-
-```bash
-crontab -u SITE_USER -e
-```
-
-Пример:
-
-```cron
-17 3 * * * /usr/bin/python3 /path/to/dealer_export.py --config /path/to/dealer_export.json >> /path/to/local/var/log/dealer_export_cron.log 2>&1
-```
-
-Учесть часовой пояс сервера:
-
-```bash
-date
-timedatectl
-```
-
-Проверить:
-
-```bash
-crontab -u SITE_USER -l
-```
-
-## 15. Финальная проверка
-
-После миграции должны успешно работать:
-
-1. запуск из терминала;
-2. запуск кнопкой из закрытого раздела Битрикс;
-3. автоматический запуск cron.
-
-После каждого сценария проверить:
-
-```text
-dealer_export.log
-generated_at в XML
-BREXIT XML
-ESSON XML
-владельца созданных файлов
-```
-
-## Краткий чек-лист
-
-```text
-[ ] Файлы экспортёра перенесены
-[ ] Python 3 найден
-[ ] Новый домен указан
-[ ] Серверные пути изменены
-[ ] Доступ к БД работает
-[ ] ID каталога и свойств проверены
-[ ] Права каталогов настроены
-[ ] Старый lock отсутствует
-[ ] --no-publish выполнен успешно
-[ ] Preview XML проверены
-[ ] Production XML опубликованы
-[ ] Публичный URL BREXIT работает
-[ ] Публичный URL ESSON работает
-[ ] Кнопка администратора работает
-[ ] Cron работает
-[ ] Логи записываются
-```
+- Снять новое задание `/etc/cron.d/discount-tools-dealer-xml-manual`.
+- Убрать только одну строку подключения меню из `init.php`.
+- Восстановить резервные копии обновлённых PHP/Bash/Python, если они были заменены.
+- Не удалять XML и существующий cron почасового обновления.
+- Вернуть конфигурацию Nginx из резервной копии, если ошибка связана с доступом к XML.

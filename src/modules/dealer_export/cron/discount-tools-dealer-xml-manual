@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+# Обработка запросов ручной генерации XML из админки; если нет запроса — ничего не делает
+* * * * * discount /bin/bash /var/www/discount-tools/public/local/tools/dealer-export/dealer_xml_manual_worker.sh
