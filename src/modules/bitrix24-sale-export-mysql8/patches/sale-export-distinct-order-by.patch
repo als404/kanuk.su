@@ -1,0 +1,6 @@
+--- a/bitrix/modules/sale/general/export.php
++++ b/bitrix/modules/sale/general/export.php
+@@ -1323,2 +1323,2 @@
+-					$dbProp = CSaleBasket::GetPropsList(Array("SORT" => "ASC", "ID" => "ASC"), Array("BASKET_ID" => $arBasket["ID"]), false, false, array("NAME", "VALUE", "CODE"));
++					$dbProp = CSaleBasket::GetPropsList(Array("SORT" => "ASC", "ID" => "ASC"), Array("BASKET_ID" => $arBasket["ID"]), false, false, array("NAME", "VALUE", "CODE", "SORT", "ID"));
+ 					while($arPropBasket = $dbProp->Fetch())
