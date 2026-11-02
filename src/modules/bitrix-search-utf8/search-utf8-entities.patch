@@ -1,0 +1,12 @@
+diff --git a/bitrix/modules/search/classes/general/search.php b/bitrix/modules/search/classes/general/search.php
+--- a/bitrix/modules/search/classes/general/search.php
++++ b/bitrix/modules/search/classes/general/search.php
+@@ -285,7 +285,7 @@
+ 
+ 	function chr($a)
+ 	{
+-		return chr($a[1]);
++		return html_entity_decode($a[0], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+ 	}
+ 
+ 	function GetFreqStatistics($lang_id, $arStem, $site_id = "")
