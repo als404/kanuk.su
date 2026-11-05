@@ -35,14 +35,6 @@ final class AdminElementProperties
             }
         }
 
-        // Создание копии товара пока не поддерживаем.
-        if (
-            !empty($_GET['action'])
-            && $_GET['action'] === 'copy'
-        ) {
-            return;
-        }
-
         try {
             $db = Application::getConnection();
 
@@ -151,6 +143,34 @@ final class AdminElementProperties
                 }
 
                 $propertyId = (int)$matches[1];
+
+               // Отображение HTML-сущностей во всех видимых свойствах.
+                // Поддерживаются числовые (&#215;, &#xD8;)
+                // и именованные (&times;, &deg;) HTML-сущности.
+                if (
+                    (!isset($technical[$propertyId]) || isset($allowed[$propertyId]))
+                    && isset($field['custom_html'])
+                    && is_string($field['custom_html'])
+                ) {
+                    $field['custom_html'] = preg_replace_callback(
+                        '/&amp;((?:#[0-9]+|#[xX][0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);)/',
+                        static function ($matches) {
+                            $entity = '&' . $matches[1];
+
+                            $decoded = html_entity_decode(
+                                $entity,
+                                ENT_QUOTES | ENT_HTML5,
+                                'UTF-8'
+                            );
+
+                            // Неизвестные HTML-сущности оставляем без изменений.
+                            return $decoded === $entity
+                                ? $matches[0]
+                                : $entity;
+                        },
+                        $field['custom_html']
+                    );
+                }
 
                 if (!isset($technical[$propertyId])) {
                     continue;
