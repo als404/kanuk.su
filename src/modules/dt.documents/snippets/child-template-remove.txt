@@ -1,0 +1,5 @@
+In /local/templates/elektro_flat/components/bitrix/catalog/.default/bitrix/catalog.element/.default/template.php remove the *old* pilot include if still present:
+<?
+require $_SERVER['DOCUMENT_ROOT'].'/local/modules/dt.documents/integration/catalog_detail.php';
+?>
+It must exist ONLY in parent element.php; preserve the surrounding closing </div> of .tabs-wrap.tabs-catalog-detail.

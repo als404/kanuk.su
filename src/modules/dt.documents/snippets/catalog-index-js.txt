@@ -1,0 +1,6 @@
+/catalog/index.php: retain db.js while fallback is needed.
+Current tested integration (same path/version query, not a new script):
+<script type="module" src="/upload/doc/db.js"></script>
+<script type="module" src="/upload/doc/addition_include.js?v=dtd-public-7938-r1"></script>
+
+Do not add both the old unversioned and versioned script tags. Do not commit db.js/PDF uploads as a part of this release unless the repository's established data policy requires it.
