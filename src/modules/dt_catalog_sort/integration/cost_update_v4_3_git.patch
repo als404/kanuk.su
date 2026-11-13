@@ -1,0 +1,43 @@
+--- a/src/modules/cost_update/lib/common.php
++++ b/src/modules/cost_update/lib/common.php
+@@ -145,9 +145,23 @@
+ function runImport(PDO $db, $brand, $rows, $dryRun=true) {
+     $c=cfg(); if ($c['price_group_id']===null) throw new RuntimeException('Set price_group_id in config.php first');
+     $brandId=getBrandId($db,$brand); $matched=findProducts($db,array_keys($rows),$brandId);
+-    $stat=['rows'=>count($rows),'missing'=>0,'ambiguous'=>0,'price'=>0,'stock'=>0,'unchanged'=>0,'cache_ids'=>[]];
++    $stat=['rows'=>count($rows),'missing'=>0,'ambiguous'=>0,'price'=>0,'stock'=>0,'unchanged'=>0,'sort_queued'=>0,'cache_ids'=>[]];
+     $setPrice=$db->prepare('UPDATE b_catalog_price SET PRICE=?, TIMESTAMP_X=NOW() WHERE ID=?');
+     $setStock=$db->prepare('UPDATE b_catalog_product SET QUANTITY=?, AVAILABLE=? WHERE ID=?');
++    // Import uses direct PDO SQL and does NOT fire Bitrix price/product events.
++    // Opt in on test only, after dt_catalog_sort_queue has been installed.
++    $sortQueueEnabled=!$dryRun && !empty($c['sort_queue_enabled']);
++    $enqueueSort=null;
++    if ($sortQueueEnabled) {
++        // Fail before modifying any product if the integration table is absent.
++        $db->query('SELECT PRODUCT_ID FROM dt_catalog_sort_queue LIMIT 0');
++        $enqueueSort=$db->prepare(
++            'INSERT INTO dt_catalog_sort_queue (PRODUCT_ID, VERSION, REASON, QUEUED_AT) '.
++            'VALUES (?, 1, ?, NOW()) '.
++            'ON DUPLICATE KEY UPDATE VERSION=VERSION+1, '.
++            'REASON=VALUES(REASON), QUEUED_AT=NOW()'
++        );
++    }
+     foreach ($rows as $sku=>$values) {
+         $found=$matched[$sku] ?? [];
+         if (!$found) { $stat['missing']++; continue; }
+@@ -185,8 +199,15 @@
+             try {
+                 if ($priceChange) $setPrice->execute([$values['price'],$p['price_id']]);
+                 if ($qtyChange) $setStock->execute([$values['qty'],$values['qty']>0?'Y':'N',$id]);
++                // Same PDO transaction as price/stock, so queue write is atomic.
++                // A stock-only import also needs the availability-related cache refreshed.
++                if ($sortQueueEnabled) {
++                    $reason=$priceChange ? ($qtyChange ? 'import-both' : 'import-price') : 'import-stock';
++                    $enqueueSort->execute([$id,$reason]);
++                }
+                 $db->commit();
+             } catch (Throwable $e) { $db->rollBack(); throw $e; }
++            if ($sortQueueEnabled) $stat['sort_queued']++;
+         }
+         if ($priceChange) $stat['price']++;
+         if ($qtyChange) $stat['stock']++;
