@@ -1,0 +1,8 @@
+.DS_Store
+*.ser
+*.log
+migration.lock
+pending_cache.json
+.env
+*.tar.gz
+*.zip

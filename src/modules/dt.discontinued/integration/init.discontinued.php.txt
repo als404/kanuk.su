@@ -1,0 +1,30 @@
+// DT Discontinued Products — серверная блокировка покупки.
+$dtDiscontinuedFile =
+    $_SERVER["DOCUMENT_ROOT"] .
+    "/local/php_interface/dt_discontinued.php";
+
+if (is_file($dtDiscontinuedFile)) {
+
+    require_once $dtDiscontinuedFile;
+
+    \Bitrix\Main\EventManager::getInstance()->addEventHandler(
+        "sale",
+        "OnSaleBasketBeforeSaved",
+        array(
+            "DTDiscontinuedProduct",
+            "onBasketBeforeSaved"
+        )
+    );
+
+    \Bitrix\Main\EventManager::getInstance()->addEventHandler(
+        "sale",
+        "OnSaleOrderBeforeSaved",
+        array(
+            "DTDiscontinuedProduct",
+            "onOrderBeforeSaved"
+        )
+    );
+}
+
+unset($dtDiscontinuedFile);
+// END DT Discontinued Products
